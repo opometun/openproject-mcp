@@ -1,7 +1,19 @@
-def test_infrastructure_works():
-    assert True
+import json
+from pathlib import Path
 
 
-if __name__ == "__main__":
-    test_infrastructure_works()
-    print("Test passed!")
+def test_fixtures_are_valid_json():
+    """Ensure we can load our sample data."""
+    fixtures_dir = Path(__file__).parent / "fixtures"
+
+    # Check Project List
+    with open(fixtures_dir / "project_list.json") as f:
+        data = json.load(f)
+        assert data["_type"] == "Collection"
+        assert len(data["_embedded"]["elements"]) >= 1
+
+    # Check Work Package
+    with open(fixtures_dir / "work_package.json") as f:
+        data = json.load(f)
+        assert data["_type"] == "WorkPackage"
+        assert data["id"] == 42

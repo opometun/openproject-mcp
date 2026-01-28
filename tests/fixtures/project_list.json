@@ -1,0 +1,51 @@
+{
+  "_type": "Collection",
+  "total": 2,
+  "count": 2,
+  "_embedded": {
+    "elements": [
+      {
+        "_type": "Project",
+        "id": 1,
+        "identifier": "demo-project",
+        "name": "Demo Project",
+        "active": true,
+        "public": true,
+        "description": {
+          "format": "markdown",
+          "raw": "This is a demo project for testing."
+        },
+        "_links": {
+          "self": {
+            "href": "/api/v3/projects/1"
+          },
+          "workPackages": {
+            "href": "/api/v3/projects/1/work_packages"
+          }
+        }
+      },
+      {
+        "_type": "Project",
+        "id": 2,
+        "identifier": "backend-api",
+        "name": "Backend API",
+        "active": true,
+        "public": false,
+        "description": {
+          "format": "markdown",
+          "raw": "API development work."
+        },
+        "_links": {
+          "self": {
+            "href": "/api/v3/projects/2"
+          }
+        }
+      }
+    ]
+  },
+  "_links": {
+    "self": {
+      "href": "/api/v3/projects"
+    }
+  }
+}
