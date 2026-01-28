@@ -1,0 +1,40 @@
+{
+  "_type": "WorkPackage",
+  "id": 42,
+  "lockVersion": 5,
+  "subject": "Fix critical login bug",
+  "description": {
+    "format": "markdown",
+    "raw": "Users cannot log in when using Firefox."
+  },
+  "startDate": "2023-10-01",
+  "dueDate": "2023-10-05",
+  "estimatedTime": "PT2H",
+  "percentageDone": 0,
+  "_links": {
+    "self": {
+      "href": "/api/v3/work_packages/42",
+      "title": "Fix critical login bug"
+    },
+    "type": {
+      "href": "/api/v3/types/1",
+      "title": "Bug"
+    },
+    "status": {
+      "href": "/api/v3/statuses/1",
+      "title": "In Progress"
+    },
+    "priority": {
+      "href": "/api/v3/priorities/2",
+      "title": "High"
+    },
+    "project": {
+      "href": "/api/v3/projects/1",
+      "title": "Demo Project"
+    },
+    "assignee": {
+      "href": "/api/v3/users/5",
+      "title": "John Doe"
+    }
+  }
+}
