@@ -15,5 +15,5 @@ def test_fixtures_are_valid_json():
     # Check Work Package
     with open(fixtures_dir / "work_package.json") as f:
         data = json.load(f)
-        assert data["_type"] == "WorkPackage"
-        assert data["id"] == 42
+        assert data["_type"] == "WorkPackageCollection"
+        assert data["_embedded"]["elements"][0]["id"] == 10001

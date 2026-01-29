@@ -1,51 +1,1328 @@
 {
-  "_type": "Collection",
-  "total": 2,
-  "count": 2,
-  "_embedded": {
-    "elements": [
-      {
-        "_type": "Project",
-        "id": 1,
-        "identifier": "demo-project",
-        "name": "Demo Project",
-        "active": true,
-        "public": true,
-        "description": {
-          "format": "markdown",
-          "raw": "This is a demo project for testing."
+    "_type": "Collection",
+    "total": 37,
+    "count": 20,
+    "pageSize": 20,
+    "offset": 1,
+    "_embedded": {
+        "elements": [
+            {
+                "_type": "Project",
+                "id": 1001,
+                "identifier": "demo-project-alpha",
+                "name": "Demo Project Alpha",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "A sample project for testing purposes.",
+                    "html": "<p>A sample project for testing purposes.</p>"
+                },
+                "createdAt": "2025-06-30T13:43:23.886Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 100,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1001",
+                        "title": "Demo Project Alpha"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1001/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1001/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1001/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1001/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1001/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221001%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1001/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221001%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1002,
+                "identifier": "demo-project-beta",
+                "name": "Demo Project Beta",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Another sample project for testing.",
+                    "html": "<p>Another sample project for testing.</p>"
+                },
+                "createdAt": "2025-06-30T13:39:54.377Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 200,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1002",
+                        "title": "Demo Project Beta"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1002/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1002/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1002/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1002/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1002/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221002%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1002/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221002%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1003,
+                "identifier": "demo-project-gamma",
+                "name": "Demo Project Gamma",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Sample project for demonstrating features.",
+                    "html": "<p>Sample project for demonstrating features.</p>"
+                },
+                "createdAt": "2025-06-30T13:30:25.125Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 300,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1003",
+                        "title": "Demo Project Gamma"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1003/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1003/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1003/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1003/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1003/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221003%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1003/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221003%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1004,
+                "identifier": "demo-project-delta",
+                "name": "Demo Project Delta",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Demo project for testing integrations.",
+                    "html": "<p>Demo project for testing integrations.</p>"
+                },
+                "createdAt": "2025-06-30T13:20:55.196Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 400,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1004",
+                        "title": "Demo Project Delta"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1004/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1004/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1004/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1004/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1004/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221004%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1004/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221004%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1005,
+                "identifier": "demo-project-epsilon",
+                "name": "Demo Project Epsilon",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Sample project for feature demonstrations.",
+                    "html": "<p>Sample project for feature demonstrations.</p>"
+                },
+                "createdAt": "2025-06-30T11:20:51.258Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 500,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1005",
+                        "title": "Demo Project Epsilon"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1005/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1005/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1005/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1005/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1005/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221005%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1005/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221005%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1006,
+                "identifier": "team-operations",
+                "name": "Team Operations",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Operations project for team management.",
+                    "html": "<p>Operations project for team management.</p>"
+                },
+                "createdAt": "2025-05-26T11:40:20.755Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 0,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1006",
+                        "title": "Team Operations"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1006/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1006/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1006/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1006/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1006/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221006%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1006/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221006%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1007,
+                "identifier": "mobile-app-development",
+                "name": "Mobile App Development",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Mobile application development project.",
+                    "html": "<p>Mobile application development project.</p>"
+                },
+                "createdAt": "2025-05-06T14:56:59.050Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 1,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1007",
+                        "title": "Mobile App Development"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1007/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1007/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1007/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1007/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1007/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221007%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1007/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "urn:openproject-org:api:v3:undisclosed",
+                            "title": "Undisclosed - The ancestor is invisible because of lacking permissions."
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221007%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "urn:openproject-org:api:v3:undisclosed",
+                        "title": "Undisclosed - The selected parent is invisible because of lacking permissions."
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1008,
+                "identifier": "data-platform",
+                "name": "Data Platform",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Project for managing data platform operations.",
+                    "html": "<p>Project for managing data platform operations.</p>"
+                },
+                "createdAt": "2025-05-06T14:55:40.602Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 1,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1008",
+                        "title": "Data Platform"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1008/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1008/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1008/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1008/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "urn:openproject-org:api:v3:undisclosed",
+                            "title": "Undisclosed - The ancestor is invisible because of lacking permissions."
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221008%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "urn:openproject-org:api:v3:undisclosed",
+                        "title": "Undisclosed - The selected parent is invisible because of lacking permissions."
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1009,
+                "identifier": "api-gateway",
+                "name": "API Gateway",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "API gateway service implementation.",
+                    "html": "<p>API gateway service implementation.</p>"
+                },
+                "createdAt": "2025-05-06T14:55:08.622Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 1,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1009",
+                        "title": "API Gateway"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1009/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1009/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1009/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1009/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "urn:openproject-org:api:v3:undisclosed",
+                            "title": "Undisclosed - The ancestor is invisible because of lacking permissions."
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221009%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "urn:openproject-org:api:v3:undisclosed",
+                        "title": "Undisclosed - The selected parent is invisible because of lacking permissions."
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1010,
+                "identifier": "messaging-service",
+                "name": "Messaging Service",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Real-time messaging service for users.",
+                    "html": "<p>Real-time messaging service for users.</p>"
+                },
+                "createdAt": "2025-05-06T14:54:39.589Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 123,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1010",
+                        "title": "Messaging Service"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1010/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1010/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1010/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1010/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "urn:openproject-org:api:v3:undisclosed",
+                            "title": "Undisclosed - The ancestor is invisible because of lacking permissions."
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221010%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "urn:openproject-org:api:v3:undisclosed",
+                        "title": "Undisclosed - The selected parent is invisible because of lacking permissions."
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1011,
+                "identifier": "notification-system",
+                "name": "Notification System",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Push notification delivery system.",
+                    "html": "<p>Push notification delivery system.</p>"
+                },
+                "createdAt": "2025-05-06T12:42:30.346Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 1234,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1011",
+                        "title": "Notification System"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1011/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1011/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1011/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1011/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1011/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221011%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1011/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221011%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1012,
+                "identifier": "requirements-phase",
+                "name": "Requirements Phase",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Initial phase for gathering requirements.",
+                    "html": "<p>Initial phase for gathering requirements.</p>"
+                },
+                "createdAt": "2025-05-06T12:41:10.346Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 202101,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1012",
+                        "title": "Requirements Phase"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1012/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1012/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1012/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1012/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1012/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221012%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1012/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221012%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1013,
+                "identifier": "data-collection",
+                "name": "Data Collection",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Project for collecting and managing data.",
+                    "html": "<p>Project for collecting and managing data.</p>"
+                },
+                "createdAt": "2025-05-06T12:40:30.346Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 202095,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1013",
+                        "title": "Data Collection"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1013/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1013/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1013/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1013/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1013/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221013%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1013/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1000",
+                            "title": "Parent Program"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221013%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Parent Program"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1000,
+                "identifier": "main-program",
+                "name": "Main Program",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "The main program for managing projects.",
+                    "html": "<p>The main program for managing projects.</p>"
+                },
+                "createdAt": "2025-04-22T14:16:26.029Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 202093,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1000",
+                        "title": "Main Program"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1000/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1000/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1000/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1000/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1000/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221000%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1000/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221000%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": null
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1014,
+                "identifier": "pilot-project",
+                "name": "Pilot Project",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "A pilot project for testing new ideas.",
+                    "html": "<p>A pilot project for testing new ideas.</p>"
+                },
+                "createdAt": "2025-04-14T09:53:43.092Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": null,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1014",
+                        "title": "Pilot Project"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1014/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1014/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1014/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1014/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1014/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221014%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1014/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221014%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": null
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1015,
+                "identifier": "quality-control",
+                "name": "Quality Control",
+                "active": true,
+                "public": false,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Quality control and assurance project.",
+                    "html": "<p>Quality control and assurance project.</p>"
+                },
+                "createdAt": "2025-04-04T06:11:56.753Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": null,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1015",
+                        "title": "Quality Control"
+                    },
+                    "createWorkPackage": {
+                        "href": "/api/v3/projects/1015/work_packages/form",
+                        "method": "post"
+                    },
+                    "createWorkPackageImmediately": {
+                        "href": "/api/v3/projects/1015/work_packages",
+                        "method": "post"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1015/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1015/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1015/versions"
+                    },
+                    "memberships": {
+                        "href": "/api/v3/memberships?filters=%5B%7B%22project%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221015%22%5D%7D%7D%5D"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1015/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221015%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": null
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1016,
+                "identifier": "education-platform",
+                "name": "Education Platform",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Platform for online education and training.",
+                    "html": "<p>Platform for online education and training.</p>"
+                },
+                "createdAt": "2025-03-20T08:52:36.975Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": null,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1016",
+                        "title": "Education Platform"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1016/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1016/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1016/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1016/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221016%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": null
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1017,
+                "identifier": "innovation-lab",
+                "name": "Innovation Lab",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Research and development innovation initiatives.",
+                    "html": "<p>Research and development innovation initiatives.</p>"
+                },
+                "createdAt": "2025-03-20T08:52:36.975Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": 61340813,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1017",
+                        "title": "Innovation Lab"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1017/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1017/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1017/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1017/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221017%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": null
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1018,
+                "identifier": "policy-initiative",
+                "name": "Policy Initiative",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Initiative for developing and promoting policies.",
+                    "html": "<p>Initiative for developing and promoting policies.</p>"
+                },
+                "createdAt": "2025-03-20T08:52:36.975Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": null,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1018",
+                        "title": "Policy Initiative"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1018/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1018/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1018/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1018/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [
+                        {
+                            "href": "/api/v3/projects/1019",
+                            "title": "Strategic Programs"
+                        }
+                    ],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221018%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": "/api/v3/projects/1019",
+                        "title": "Strategic Programs"
+                    }
+                }
+            },
+            {
+                "_type": "Project",
+                "id": 1019,
+                "identifier": "strategic-programs",
+                "name": "Strategic Programs",
+                "active": true,
+                "public": true,
+                "description": {
+                    "format": "markdown",
+                    "raw": "Programs with strategic importance.",
+                    "html": "<p>Programs with strategic importance.</p>"
+                },
+                "createdAt": "2025-03-20T08:52:36.975Z",
+                "updatedAt": "2026-01-21T14:14:55.756Z",
+                "statusExplanation": {
+                    "format": "markdown",
+                    "raw": "",
+                    "html": ""
+                },
+                "customField16": null,
+                "_links": {
+                    "self": {
+                        "href": "/api/v3/projects/1019",
+                        "title": "Strategic Programs"
+                    },
+                    "workPackages": {
+                        "href": "/api/v3/projects/1019/work_packages"
+                    },
+                    "storages": [],
+                    "categories": {
+                        "href": "/api/v3/projects/1019/categories"
+                    },
+                    "versions": {
+                        "href": "/api/v3/projects/1019/versions"
+                    },
+                    "types": {
+                        "href": "/api/v3/projects/1019/types"
+                    },
+                    "schema": {
+                        "href": "/api/v3/projects/schema"
+                    },
+                    "status": {
+                        "href": null
+                    },
+                    "ancestors": [],
+                    "projectStorages": {
+                        "href": "/api/v3/project_storages?filters=%5B%7B%22projectId%22%3A%7B%22operator%22%3A%22%3D%22%2C%22values%22%3A%5B%221019%22%5D%7D%7D%5D"
+                    },
+                    "parent": {
+                        "href": null
+                    }
+                }
+            }
+        ]
+    },
+    "_links": {
+        "self": {
+            "href": "/api/v3/projects?filters=%5B%5D&offset=1&pageSize=20"
         },
-        "_links": {
-          "self": {
-            "href": "/api/v3/projects/1"
-          },
-          "workPackages": {
-            "href": "/api/v3/projects/1/work_packages"
-          }
-        }
-      },
-      {
-        "_type": "Project",
-        "id": 2,
-        "identifier": "backend-api",
-        "name": "Backend API",
-        "active": true,
-        "public": false,
-        "description": {
-          "format": "markdown",
-          "raw": "API development work."
+        "jumpTo": {
+            "href": "/api/v3/projects?filters=%5B%5D&offset=%7Boffset%7D&pageSize=20",
+            "templated": true
         },
-        "_links": {
-          "self": {
-            "href": "/api/v3/projects/2"
-          }
-        }
-      }
-    ]
-  },
-  "_links": {
-    "self": {
-      "href": "/api/v3/projects"
+        "changeSize": {
+            "href": "/api/v3/projects?filters=%5B%5D&offset=1&pageSize=%7Bsize%7D",
+            "templated": true
+        },
+        "nextByOffset": {
+            "href": "/api/v3/projects?filters=%5B%5D&offset=2&pageSize=20"
+        },
+        "representations": [
+            {
+                "href": "/projects.csv?filters=%5B%5D&offset=1&pageSize=20",
+                "identifier": "csv",
+                "type": "text/csv",
+                "title": "CSV"
+            },
+            {
+                "href": "/projects.xls?filters=%5B%5D&offset=1&pageSize=20",
+                "identifier": "xls",
+                "type": "application/vnd.ms-excel",
+                "title": "XLS"
+            }
+        ]
     }
-  }
 }
