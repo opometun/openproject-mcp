@@ -51,23 +51,50 @@ Tools exposed to the LLM must follow `snake_case` with a standard `verb_noun` st
 * **Dates:** ISO 8601 (`YYYY-MM-DD`).
 * **Duration:** ISO 8601 duration (`PT2H`) or simple string (`2h`) if handled by a helper.
 
-### Output (Tool Responses)
-To prevent overflowing the LLM context window, we distinguish between **Summary** and **Raw** views.
+### Output Format Decision
+
+**For Collections (list_projects, list_work_packages):**
+Return **array of summary objects** + metadata:
+```json
+{
+  "items": [...],
+  "total": 37,
+  "showing": 20,
+  "hasMore": true
+}
+```
+
+**For Single Items (get_work_package):**
+Return **summary object** directly.
 
 #### A. Summary View (Default)
-Optimized for token efficiency. Returns only fields relevant to decision-making.
-* **Format:** JSON or structured Text.
-* **Example (Work Package):**
-    ```json
-    {
-      "id": 123,
-      "subject": "Fix login bug",
-      "status": "In Progress",
-      "priority": "High",
-      "assignee": "Jane Doe",
-      "link": "https://.../work_packages/123"
-    }
-    ```
+**Work Package Summary:**
+```json
+{
+  "id": 12345,
+  "subject": "Implement user authentication feature",
+  "status": "In Progress",           // From _links.status.title
+  "priority": "High",                 // From _links.priority.title
+  "assignee": "John Doe" | null,      // From _links.assignee.title
+  "project": "Project Alpha",
+  "version": "Sprint 3",              // From _links.version.title
+  "storyPoints": 5,
+  "dueDate": "2025-08-12",
+  "link": "https://{base}/work_packages/12345"
+}
+```
+
+**Project Summary:**
+```json
+{
+  "id": 1001,
+  "name": "Project Alpha",
+  "identifier": "project-alpha",
+  "active": true,
+  "parent": "Program Beta" | null,
+  "link": "https://{base}/projects/1001"
+}
+```
 
 #### B. Error Responses
 Errors must be descriptive to allow the LLM to self-correct.
@@ -92,16 +119,48 @@ We map OpenProject HTTP status codes to specific user-facing messages.
 
 ## 5. HAL & API Interaction Standards
 
-OpenProject uses **HAL+JSON** (Hypertext Application Language).
+### Embedded Resources
+OpenProject embeds related entities to reduce API calls:
+* `_embedded.elements[]` - Main collection items
+* `_embedded.schemas` - Schema definitions (work packages)
+* Within items: `_links.{relation}.title` often contains display names
 
-* **`_links`:** We must follow `_links` to discover valid actions or related resources (e.g., transitions).
-* **`_embedded`:** Use embedded resources (e.g., `type`, `priority`) to avoid extra round-trip API calls when possible.
-* **LockVersion:** When updating, we must handle optimistic locking (check `lockVersion`) or blindly overwrite if safe (decision: *blind overwrite for MVP, add locking logic if conflicts occur frequently*).
+**Convention:** 
+* Extract IDs from `_links.{relation}.href` (e.g., `/api/v3/projects/1001` → `1001`)
+* Use `_links.{relation}.title` for display names when available
+* Handle `"href": null` gracefully (missing relations)
 
-```python
-# Example of expected HAL handling convention
-def extract_link_id(payload, relation):
-    """
-    Extracts ID from payload['_links'][relation]['href']
-    """
-    pass
+### Undisclosed Resources
+Some parent projects may show:
+```json
+"href": "urn:openproject-org:api:v3:undisclosed"
+```
+This indicates **permission restrictions**. Display as "Restricted" to user.
+
+
+## 6. Pagination & Collection Responses
+
+All list endpoints return paginated `Collection` types with:
+* `total`: Total available items
+* `count`: Items in current page
+* `pageSize`: Items per page
+* `offset`: Current page offset
+
+**Pagination Links:**
+```json
+"_links": {
+  "nextByOffset": { "href": "..." },
+  "jumpTo": { "href": "...", "templated": true }
+}
+```
+
+**Default Strategy:** Fetch first page only for MVP. Add pagination support if needed based on user feedback.
+
+## 7. Custom Fields
+
+OpenProject instances may have custom fields (e.g., `customField16`).
+
+**Convention:**
+* Document known custom fields per deployment in a separate config
+* For MVP: Ignore custom fields unless explicitly requested
+* If surfacing to LLM, use generic names: `custom_field_16: 12345`
