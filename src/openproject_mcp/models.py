@@ -55,6 +55,31 @@ class BaseHALModel(BaseModel):
             return None
 
 
+# --- Lightweight Metadata Reference Models ---
+
+
+class TypeRef(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PriorityRef(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class StatusRef(BaseModel):
+    id: int
+    name: str
+    is_closed: bool = Field(default=False, alias="isClosed")
+
+    model_config = ConfigDict(extra="ignore")
+
+
 # --- Summary Models (Output) ---
 
 
