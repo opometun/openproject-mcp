@@ -4,7 +4,10 @@ from types import ModuleType
 import pytest
 from mcp.server.fastmcp import FastMCP
 from openproject_mcp.client import OpenProjectClient
-from openproject_mcp.server_registry import register_discovered_tools
+from openproject_mcp.server_registry import (
+    discover_tool_modules,
+    register_discovered_tools,
+)
 
 
 def _make_module(name: str, code: str) -> ModuleType:
@@ -70,3 +73,42 @@ def test_register_discovered_tools_duplicate_names_raise():
 
     with pytest.raises(ValueError):
         register_discovered_tools(app, client, modules=[mod1, mod2])
+
+
+def test_discover_tool_modules_skips_import_failures(monkeypatch, caplog):
+    import importlib
+    import pkgutil
+
+    # Ensure base package import works
+
+    class Info:
+        def __init__(self, name):
+            self.name = name
+
+    def fake_iter_modules(path, prefix):
+        return [
+            Info(prefix + "good"),
+            Info(prefix + "bad"),
+        ]
+
+    good_mod = _make_module(
+        "openproject_mcp.tools.good", "async def tool_fn(client): return None"
+    )
+
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name, *args, **kwargs):
+        if name == "openproject_mcp.tools.bad":
+            raise ImportError("boom")
+        if name == "openproject_mcp.tools.good":
+            return good_mod
+        return real_import_module(name, *args, **kwargs)
+
+    monkeypatch.setattr(pkgutil, "iter_modules", fake_iter_modules)
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
+
+    with caplog.at_level("ERROR"):
+        modules = discover_tool_modules()
+
+    assert [m.__name__ for m in modules] == ["openproject_mcp.tools.good"]
+    assert any("Failed importing tool module" in rec.message for rec in caplog.records)

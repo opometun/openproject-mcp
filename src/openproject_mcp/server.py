@@ -11,8 +11,12 @@ from openproject_mcp.server_registry import register_discovered_tools
 
 
 def create_client_from_env() -> OpenProjectClient:
-    client = OpenProjectClient.from_env()
-    return client
+    try:
+        return OpenProjectClient.from_env()
+    except ValueError as exc:
+        raise ValueError(
+            "Missing OPENPROJECT_BASE_URL or OPENPROJECT_API_KEY in environment."
+        ) from exc
 
 
 # --- Entry point ----------------------------------------------------------- #

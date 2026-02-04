@@ -170,3 +170,15 @@ OpenProject instances may have custom fields (e.g., `customField16`).
 * Document known custom fields per deployment in a separate config
 * For MVP: Ignore custom fields unless explicitly requested
 * If surfacing to LLM, use generic names: `custom_field_16: 12345`
+
+
+## 11. Tool Discovery & Registration (MCP Server)
+
+* Tools live in `openproject_mcp.tools.*` modules.
+* A function is registered as a tool only if:
+  - async, name does not start with `_`
+  - first parameter is `client`
+  - defined in its module (not imported)
+* `client` is injected by the server and hidden from the exposed signature.
+* Duplicate tool names fail fast at startup.
+* Missing env vars (`OPENPROJECT_BASE_URL`, `OPENPROJECT_API_KEY`) raise a clear error during server startup.
