@@ -8,20 +8,9 @@ from pydantic import BaseModel
 
 from openproject_mcp.client import OpenProjectClient
 from openproject_mcp.models import PriorityRef, StatusRef, TypeRef
+from openproject_mcp.tools._collections import embedded_elements
 
 T = TypeVar("T", bound=BaseModel)
-
-
-def _embedded_elements(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Extract elements list from a HAL collection payload.
-    Raises ValueError if the expected structure is missing or malformed.
-    """
-    embedded = payload.get("_embedded", {})
-    elements = embedded.get("elements", [])
-    if not isinstance(elements, list):
-        raise ValueError("Expected _embedded.elements to be a list.")
-    return [e for e in elements if isinstance(e, dict)]
 
 
 @dataclass
@@ -59,7 +48,7 @@ async def _fetch_metadata(
         return entry.data  # type: ignore[return-value]
 
     payload = await client.get(endpoint, tool="metadata")
-    raw_elements = _embedded_elements(payload)
+    raw_elements = embedded_elements(payload)
 
     items: List[T] = [model.model_validate(e) for e in raw_elements]
 

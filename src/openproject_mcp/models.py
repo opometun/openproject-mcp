@@ -83,8 +83,28 @@ class StatusRef(BaseModel):
 class ProjectRef(BaseModel):
     id: int
     name: str
+    identifier: Optional[str] = None
 
     model_config = ConfigDict(extra="ignore")
+
+
+# --- Input Models (Tool Payloads) ---
+class WorkPackageCreateInput(BaseModel):
+    project: str
+    type: str
+    subject: str
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class WorkPackageUpdateStatusInput(BaseModel):
+    id: int
+    status: str
+
+    model_config = ConfigDict(extra="forbid")
 
 
 # --- Summary Models (Output) ---

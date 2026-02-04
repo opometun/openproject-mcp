@@ -47,20 +47,21 @@ Tools exposed to the LLM must follow `snake_case` with a standard `verb_noun` st
 ## 3. Data Formatting (Input/Output)
 
 ### Input (Tool Arguments)
-* **IDs:** Always expect `integer` for IDs (Project ID, Work Package ID).
+* **IDs:** Integers when the API requires an ID (e.g., work package id). For create/update flows we accept **names/identifiers** for project, type, priority, status and resolve them to IDs.
 * **Dates:** ISO 8601 (`YYYY-MM-DD`).
 * **Duration:** ISO 8601 duration (`PT2H`) or simple string (`2h`) if handled by a helper.
 
 ### Output Format Decision
 
 **For Collections (list_projects, list_work_packages):**
-Return **array of summary objects** + metadata:
+Return envelope with pagination fields:
 ```json
 {
-  "items": [...],
-  "total": 37,
-  "showing": 20,
-  "hasMore": true
+  "items": [...],          // simplified summaries
+  "offset": 0,
+  "page_size": 50,
+  "total": 120,            // falls back to len(items) if server omits
+  "next_offset": 50        // null if at end
 }
 ```
 
@@ -138,25 +139,30 @@ Some parent projects may show:
 This indicates **permission restrictions**. Display as "Restricted" to user.
 
 
-## 6. Pagination & Collection Responses
+## 6. Pagination & Collection Responses (Stage 1)
 
-All list endpoints return paginated `Collection` types with:
-* `total`: Total available items
-* `count`: Items in current page
-* `pageSize`: Items per page
-* `offset`: Current page offset
+* Contract: `offset` (>=0), `page_size` (clamped 1–200), `total` (from payload if provided, else `len(items)`), `next_offset` (`offset + page_size` if still within total, else `null`).
+* All list tools (projects, work packages, metadata) use offset/page_size—not page numbers.
+* Only one HTTP call per invocation; no auto-follow pagination.
 
-**Pagination Links:**
-```json
-"_links": {
-  "nextByOffset": { "href": "..." },
-  "jumpTo": { "href": "...", "templated": true }
-}
-```
+## 7. Resolution Rules (Stage 1)
 
-**Default Strategy:** Fetch first page only for MVP. Add pagination support if needed based on user feedback.
+* Project resolution order: identifier exact (case-insensitive) → name exact → name contains; ambiguous matches raise a ValueError listing candidates.
+* Types, priorities, statuses: resolved via metadata tools by name (case-insensitive; exact then contains).
+* No hardcoded IDs in tool entrypoints.
 
-## 7. Custom Fields
+## 8. Filtering (Stage 1)
+
+* List work packages: client-side `project` filter (after resolving project id) and `subject_contains` (case-insensitive substring).
+* List projects: optional client-side `name_contains`.
+* Server-side filter DSL is intentionally deferred until verified.
+
+## 9. Create/Update Behaviors (Work Packages)
+
+* Create: requires project name/identifier, type name, subject; optional description, priority name, status name. Description is sent as `{"raw": ...}`. Status is optional because workflows may reject it—errors bubble as OpenProjectHTTPError.
+* Update status: fetches current `lockVersion`, resolves status name to id, PATCHes with `lockVersion` and status link.
+
+## 10. Custom Fields
 
 OpenProject instances may have custom fields (e.g., `customField16`).
 
