@@ -80,6 +80,13 @@ class StatusRef(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class ProjectRef(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(extra="ignore")
+
+
 # --- Summary Models (Output) ---
 
 
