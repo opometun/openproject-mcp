@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+import importlib
+import inspect
+import logging
+import pkgutil
+from types import ModuleType
+from typing import Callable, Iterable, List, Set
+
+from openproject_mcp.client import OpenProjectClient
+
+log = logging.getLogger("openproject_mcp.server_registry")
+
+
+# --- Discovery helpers ----------------------------------------------------- #
+
+
+def discover_tool_modules(
+    package_name: str = "openproject_mcp.tools",
+) -> List[ModuleType]:
+    """Import all modules under the given tools package, skipping failures."""
+    modules: List[ModuleType] = []
+    base_pkg = importlib.import_module(package_name)
+
+    for finder in pkgutil.iter_modules(base_pkg.__path__, base_pkg.__name__ + "."):
+        name = finder.name
+        try:
+            module = importlib.import_module(name)
+            modules.append(module)
+        except Exception as exc:  # pragma: no cover - logged, not fatal
+            log.error("Failed importing tool module %s: %s", name, exc)
+            continue
+
+    return modules
+
+
+def iter_tool_functions(module: ModuleType) -> Iterable[Callable]:
+    """Yield functions that satisfy the tool convention."""
+    for _, func in inspect.getmembers(module, inspect.iscoroutinefunction):
+        if func.__name__.startswith("_"):
+            continue
+        if func.__module__ != module.__name__:
+            # Skip imported functions
+            continue
+
+        sig = inspect.signature(func)
+        params = list(sig.parameters.values())
+        if not params or params[0].name != "client":
+            log.debug(
+                "Skipping %s.%s: first parameter must be 'client'",
+                module.__name__,
+                func.__name__,
+            )
+            continue
+
+        yield func
+
+
+# --- Wrapping / registration ---------------------------------------------- #
+
+
+def _wrap_tool(func: Callable, client: OpenProjectClient) -> Callable:
+    """Return a wrapper that injects client and hides it from the signature."""
+    original_sig = inspect.signature(func)
+    params = list(original_sig.parameters.values())[1:]  # drop 'client'
+    new_sig = inspect.Signature(
+        parameters=params, return_annotation=original_sig.return_annotation
+    )
+
+    async def wrapped(*args, **kwargs):
+        return await func(client, *args, **kwargs)
+
+    wrapped.__name__ = func.__name__
+    wrapped.__doc__ = func.__doc__
+    wrapped.__module__ = func.__module__
+    wrapped.__signature__ = new_sig  # type: ignore[attr-defined]
+    return wrapped
+
+
+def register_discovered_tools(
+    app, client: OpenProjectClient, modules: List[ModuleType] | None = None
+) -> None:
+    from mcp.server.fastmcp import (
+        FastMCP,  # local import to avoid hard dep for unit tests
+    )
+
+    if not isinstance(app, FastMCP):
+        raise TypeError("app must be a FastMCP instance")
+
+    modules = modules or discover_tool_modules()
+    seen_names: Set[str] = set()
+
+    for module in modules:
+        for func in iter_tool_functions(module):
+            name = func.__name__
+            if name in seen_names:
+                raise ValueError(f"Duplicate tool name detected: {name}")
+
+            wrapped = _wrap_tool(func, client)
+            app.tool(name=name)(wrapped)
+            seen_names.add(name)
+            log.info("Registered tool: %s (%s)", name, module.__name__)
