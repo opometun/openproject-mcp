@@ -18,6 +18,7 @@ from .metadata import (
     resolve_type_id,
 )
 from .projects import list_projects
+from .time_entries import log_time
 from .work_packages import (
     create_work_package,
     get_work_package,
@@ -38,4 +39,5 @@ __all__ = [
     "get_work_package",
     "create_work_package",
     "update_status",
+    "log_time",
 ]
