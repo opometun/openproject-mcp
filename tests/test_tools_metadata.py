@@ -1,7 +1,7 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient
+from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.tools import metadata
 from openproject_mcp.tools.metadata import (
     list_priorities,
@@ -147,3 +147,15 @@ async def test_list_types_uses_cache(client):
         await list_types(client)
 
     assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_types_404_propagates(client):
+    respx.get("https://mock-op.com/api/v3/types").mock(
+        return_value=Response(404, json={"message": "Not found"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await list_types(client)

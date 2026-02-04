@@ -1,7 +1,7 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient
+from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.models import WorkPackageCreateInput, WorkPackageUpdateStatusInput
 from openproject_mcp.tools.work_packages import (
     create_work_package,
@@ -151,3 +151,52 @@ async def test_update_status_uses_lock_version(client):
 
     body = json.loads(patch_route.calls[0].request.content)
     assert body["lockVersion"] == 3
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_work_package_404_propagates(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/999").mock(
+        return_value=Response(404, json={"message": "Not found"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await get_work_package(client, 999)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_work_package_422_propagates(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(200, json=PROJECTS)
+    )
+    respx.get("https://mock-op.com/api/v3/types").mock(
+        return_value=Response(200, json=TYPES)
+    )
+    respx.post("https://mock-op.com/api/v3/work_packages").mock(
+        return_value=Response(422, json={"message": "Invalid"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await create_work_package(
+                client,
+                data=WorkPackageCreateInput(
+                    project="Demo",
+                    type="Bug",
+                    subject="Bad",
+                ),
+            )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_work_packages_401_propagates(client):
+    respx.get("https://mock-op.com/api/v3/work_packages").mock(
+        return_value=Response(401, json={"message": "Unauthorized"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await list_work_packages(client)
