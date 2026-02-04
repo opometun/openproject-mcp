@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from openproject_mcp.client import OpenProjectClient
 from openproject_mcp.models import ProjectRef
-from openproject_mcp.tools.metadata import _embedded_elements
+from openproject_mcp.tools._collections import embedded_elements
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -42,7 +42,7 @@ async def list_projects(
     params = {"offset": offset, "pageSize": page_size}
     payload = await client.get("/api/v3/projects", params=params, tool="projects")
 
-    elements = _embedded_elements(payload)
+    elements = embedded_elements(payload)
     projects: List[ProjectRef] = [ProjectRef.model_validate(e) for e in elements]
 
     if name_contains:
