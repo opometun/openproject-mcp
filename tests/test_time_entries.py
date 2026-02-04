@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient
+from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.tools.time_entries import log_time
 from openproject_mcp.utils.time_parser import DurationParseError, parse_duration_string
 
@@ -78,3 +78,15 @@ async def test_log_time_invalid_duration_returns_error_message(client):
 
     assert "Error:" in msg
     assert "2h" in msg and "30m" in msg
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_log_time_404_propagates(client):
+    respx.post("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(404, json={"message": "Not found"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await log_time(client, work_package_id=123, duration="2h")

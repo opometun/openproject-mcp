@@ -1,10 +1,12 @@
 import base64
 
+import httpx
 import pytest
 import respx
 from httpx import Response
 from openproject_mcp.client import (
     OpenProjectClient,
+    OpenProjectClientError,
     OpenProjectHTTPError,
     OpenProjectParseError,
 )
@@ -58,6 +60,53 @@ async def test_404_raises_typed_error():
 
         assert exc.value.status_code == 404
         assert "Not found" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_401_raises_typed_error():
+    async with respx.mock:
+        respx.get("https://mock-op.com/api/v3/projects").mock(
+            return_value=Response(401, json={"message": "Unauthorized"})
+        )
+
+        client = OpenProjectClient(base_url="https://mock-op.com", api_key="mock-key")
+        async with client:
+            with pytest.raises(OpenProjectHTTPError) as exc:
+                await client.get("/api/v3/projects")
+
+        assert exc.value.status_code == 401
+        assert "Unauthorized" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_422_raises_typed_error():
+    async with respx.mock:
+        respx.post("https://mock-op.com/api/v3/projects").mock(
+            return_value=Response(422, json={"message": "Invalid data"})
+        )
+
+        client = OpenProjectClient(base_url="https://mock-op.com", api_key="mock-key")
+        async with client:
+            with pytest.raises(OpenProjectHTTPError) as exc:
+                await client.post("/api/v3/projects", json={"name": ""})
+
+        assert exc.value.status_code == 422
+        assert "Invalid data" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_connect_timeout_after_retries():
+    async with respx.mock:
+        respx.get("https://mock-op.com/api/v3/projects").mock(
+            side_effect=httpx.ConnectTimeout("boom")
+        )
+
+        client = OpenProjectClient(
+            base_url="https://mock-op.com", api_key="mock-key", timeout_seconds=0.1
+        )
+        async with client:
+            with pytest.raises(OpenProjectClientError):
+                await client.get("/api/v3/projects")
 
 
 @pytest.mark.asyncio

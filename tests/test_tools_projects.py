@@ -1,7 +1,7 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient
+from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.tools.projects import list_projects
 
 PROJECTS_PAYLOAD = {
@@ -118,3 +118,15 @@ async def test_page_size_clamped(client):
 
     request = route.calls[0].request
     assert request.url.params["pageSize"] == "200"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_projects_404_propagates(client):
+    respx.get("https://mock-op.com/api/v3/projects").mock(
+        return_value=Response(404, json={"message": "Not found"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await list_projects(client)
