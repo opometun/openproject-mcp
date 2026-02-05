@@ -4,7 +4,6 @@ import asyncio
 import logging
 
 from mcp.server.fastmcp import FastMCP
-from mcp.server.stdio import stdio_server
 
 from openproject_mcp.client import OpenProjectClient
 from openproject_mcp.server_registry import register_discovered_tools
@@ -29,7 +28,8 @@ async def main() -> None:
     app = FastMCP("openproject-mcp")
     register_discovered_tools(app, client)
 
-    await stdio_server(app)
+    # Run using FastMCP's stdio runner
+    await app.run_stdio_async()
 
 
 if __name__ == "__main__":

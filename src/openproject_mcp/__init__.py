@@ -16,8 +16,6 @@ from .hal import (
     parse_id_from_href,
     resolve_property,
 )
-from .server import main as run_server
-from .server_registry import discover_tool_modules, register_discovered_tools
 
 __all__ = [
     # Client
@@ -35,8 +33,4 @@ __all__ = [
     "get_embedded",
     "parse_id_from_href",
     "resolve_property",
-    # Server utilities
-    "run_server",
-    "discover_tool_modules",
-    "register_discovered_tools",
 ]
