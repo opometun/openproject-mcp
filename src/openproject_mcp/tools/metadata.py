@@ -98,21 +98,41 @@ async def resolve_metadata_id(
 ) -> int:
     """
     Resolve a metadata item's ID by name.
-    Exact match (case-insensitive) first, then substring fallback.
+    - Exact match (case-insensitive) wins.
+    - Single substring match is allowed.
+    - Multiple substring matches raise an ambiguity error listing candidates.
     """
     items = await _fetch_metadata(client, endpoint, model)
     q = _norm(name_query)
 
+    # 1) Exact match
     for item in items:
         if _norm(getattr(item, "name", "")) == q:
             return int(item.id)
 
+    # 2) Partial match with disambiguation
+    matches = []
     for item in items:
-        if q in _norm(getattr(item, "name", "")):
-            return int(item.id)
+        name = getattr(item, "name", "")
+        if q in _norm(name):
+            matches.append(item)
 
+    if len(matches) == 1:
+        return int(matches[0].id)
+
+    if len(matches) > 1:
+        candidates = [f"{i.name} (ID: {i.id})" for i in matches]
+        raise ValueError(
+            f"Ambiguous match for '{name_query}'. "
+            f"Found multiple candidates: {', '.join(candidates)}. "
+            "Please be more specific."
+        )
+
+    # 3) No match
     available = [getattr(i, "name", "") for i in items]
-    raise ValueError(f"'{name_query}' not found. Available: {available}")
+    raise ValueError(
+        f"Could not find '{name_query}'. Available options: {', '.join(available)}"
+    )
 
 
 async def resolve_type_id(client: OpenProjectClient, type_name: str) -> int:

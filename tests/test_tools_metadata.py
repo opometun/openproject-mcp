@@ -122,6 +122,32 @@ async def test_resolve_status_id_substring_fallback(client):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_resolve_status_id_ambiguous_raises_error(client):
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {"id": 1, "name": "In Progress", "isClosed": False},
+                        {"id": 2, "name": "Progress Review", "isClosed": False},
+                    ]
+                }
+            },
+        )
+    )
+
+    async with client:
+        with pytest.raises(ValueError) as exc:
+            await resolve_status_id(client, "Progress")
+
+    assert "Ambiguous match" in str(exc.value)
+    assert "In Progress" in str(exc.value)
+    assert "Progress Review" in str(exc.value)
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_resolve_priority_id_not_found_lists_available(client):
     respx.get("https://mock-op.com/api/v3/priorities").mock(
         return_value=Response(200, json=PRIORITIES_PAYLOAD)
