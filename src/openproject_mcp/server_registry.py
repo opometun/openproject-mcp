@@ -5,7 +5,7 @@ import inspect
 import logging
 import pkgutil
 from types import ModuleType
-from typing import Callable, Iterable, List, Set
+from typing import Callable, Iterable, List, Set, get_origin, get_type_hints
 
 from openproject_mcp.client import OpenProjectClient
 
@@ -39,6 +39,10 @@ def iter_tool_functions(module: ModuleType) -> Iterable[Callable]:
     for _, func in inspect.getmembers(module, inspect.iscoroutinefunction):
         if func.__name__.startswith("_"):
             continue
+        # Skip helper resolvers not meant to be exposed as tools
+        if func.__name__ == "resolve_metadata_id":
+            log.debug("Skipping %s.%s (helper)", module.__name__, func.__name__)
+            continue
         if func.__module__ != module.__name__:
             # Skip imported functions
             continue
@@ -53,6 +57,22 @@ def iter_tool_functions(module: ModuleType) -> Iterable[Callable]:
             )
             continue
 
+        # Skip helpers that take Type[...] or other generics that FastMCP/Pydantic
+        # can't schema-generate (e.g., resolve_metadata_id).
+        bad_annotation = False
+        for p in params[1:]:
+            origin = get_origin(p.annotation)
+            if origin is type:
+                bad_annotation = True
+                break
+        if bad_annotation:
+            log.debug(
+                "Skipping %s.%s: unsupported parameter annotation (Type[...] detected)",
+                module.__name__,
+                func.__name__,
+            )
+            continue
+
         yield func
 
 
@@ -62,10 +82,17 @@ def iter_tool_functions(module: ModuleType) -> Iterable[Callable]:
 def _wrap_tool(func: Callable, client: OpenProjectClient) -> Callable:
     """Return a wrapper that injects client and hides it from the signature."""
     original_sig = inspect.signature(func)
-    params = list(original_sig.parameters.values())[1:]  # drop 'client'
-    new_sig = inspect.Signature(
-        parameters=params, return_annotation=original_sig.return_annotation
-    )
+    type_hints = get_type_hints(func)
+
+    new_params = []
+    for i, (name, param) in enumerate(original_sig.parameters.items()):
+        if i == 0 and name == "client":
+            continue  # drop injected client
+        ann = type_hints.get(name, param.annotation)
+        new_params.append(param.replace(annotation=ann))
+
+    return_ann = type_hints.get("return", original_sig.return_annotation)
+    new_sig = inspect.Signature(parameters=new_params, return_annotation=return_ann)
 
     async def wrapped(*args, **kwargs):
         return await func(client, *args, **kwargs)

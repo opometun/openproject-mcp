@@ -36,7 +36,7 @@ async def _fetch_metadata(
     model: Type[T],
     *,
     ttl_seconds: float = DEFAULT_TTL_SECONDS,
-) -> List[T]:
+) -> list[T]:
     """
     Fetch metadata from an endpoint, validate with `model`, and cache the result.
     """
@@ -59,7 +59,7 @@ async def _fetch_metadata(
 # --- Public list helpers ---
 
 
-async def list_types(client: OpenProjectClient) -> List[Dict[str, Any]]:
+async def list_types(client: OpenProjectClient) -> list[dict[str, Any]]:
     """
     Return minimal list of available Types as dictionaries {id, name}.
     """
@@ -67,7 +67,7 @@ async def list_types(client: OpenProjectClient) -> List[Dict[str, Any]]:
     return [{"id": t.id, "name": t.name} for t in types]
 
 
-async def list_statuses(client: OpenProjectClient) -> List[Dict[str, Any]]:
+async def list_statuses(client: OpenProjectClient) -> list[dict[str, Any]]:
     """
     Return minimal list of Statuses as dictionaries {id, name, is_closed}.
     """
@@ -75,7 +75,7 @@ async def list_statuses(client: OpenProjectClient) -> List[Dict[str, Any]]:
     return [{"id": s.id, "name": s.name, "is_closed": s.is_closed} for s in statuses]
 
 
-async def list_priorities(client: OpenProjectClient) -> List[Dict[str, Any]]:
+async def list_priorities(client: OpenProjectClient) -> list[dict[str, Any]]:
     """
     Return minimal list of Priorities as dictionaries {id, name}.
     """
