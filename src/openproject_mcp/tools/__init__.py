@@ -21,9 +21,14 @@ from .projects import list_projects
 from .system import system_ping
 from .time_entries import log_time
 from .work_packages import (
+    add_comment,
+    append_work_package_description,
     create_work_package,
     get_work_package,
+    get_work_package_statuses,
+    get_work_package_types,
     list_work_packages,
+    search_content,
     update_status,
 )
 
@@ -37,8 +42,13 @@ __all__ = [
     "resolve_priority_id",
     "list_projects",
     "system_ping",
+    "add_comment",
     "list_work_packages",
     "get_work_package",
+    "append_work_package_description",
+    "search_content",
+    "get_work_package_statuses",
+    "get_work_package_types",
     "create_work_package",
     "update_status",
     "log_time",

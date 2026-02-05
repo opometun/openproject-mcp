@@ -1,12 +1,20 @@
+import json
+
+import openproject_mcp.tools.metadata as metadata
 import pytest
 import respx
 from httpx import Response
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.models import WorkPackageCreateInput, WorkPackageUpdateStatusInput
 from openproject_mcp.tools.work_packages import (
+    add_comment,
+    append_work_package_description,
     create_work_package,
     get_work_package,
+    get_work_package_statuses,
+    get_work_package_types,
     list_work_packages,
+    search_content,
     update_status,
 )
 
@@ -54,6 +62,13 @@ STATUSES = {
 @pytest.fixture
 def client():
     return OpenProjectClient(base_url="https://mock-op.com", api_key="mock-key")
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    metadata._CACHE.clear()
+    yield
+    metadata._CACHE.clear()
 
 
 @pytest.mark.asyncio
@@ -200,3 +215,138 @@ async def test_list_work_packages_401_propagates(client):
     async with client:
         with pytest.raises(OpenProjectHTTPError):
             await list_work_packages(client)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_add_comment_posts_comment(client):
+    respx.post("https://mock-op.com/api/v3/work_packages/42/activities").mock(
+        return_value=Response(
+            201,
+            json={
+                "_links": {"self": {"href": "/api/v3/activities/9"}},
+            },
+        )
+    )
+
+    async with client:
+        result = await add_comment(client, 42, "Hello world")
+
+    assert result["work_package_id"] == 42
+    assert result["comment"] == "Hello world"
+    assert result["activity_id"] == 9
+    assert result["url"].endswith("/api/v3/activities/9")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_append_description_appends_and_preserves_lock_version(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(
+            200,
+            json={
+                **WP_SINGLE,
+                "description": {"raw": "Hello"},
+                "lockVersion": 3,
+            },
+        )
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(
+            200,
+            json={
+                **WP_SINGLE,
+                "description": {"raw": "Hello\n\nMore"},
+                "lockVersion": 4,
+            },
+        )
+    )
+
+    async with client:
+        summary = await append_work_package_description(client, 42, "More")
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["lockVersion"] == 3
+    assert body["description"]["raw"] == "Hello\n\nMore"
+    assert summary["description"] == "Hello\n\nMore"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_append_description_conflict_raises(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(409, json={"message": "Conflict"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError) as exc:
+            await append_work_package_description(client, 42, "More")
+
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_content_server_filter(client):
+    route = respx.get("https://mock-op.com/api/v3/work_packages").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {"elements": [WP_SINGLE]},
+                "total": 1,
+            },
+        )
+    )
+
+    async with client:
+        result = await search_content(client, "Sample")
+
+    assert result["scope"] == "server_filtered"
+    assert result["items"][0]["id"] == 42
+    # Ensure filters param was sent
+    assert "filters" in route.calls[0].request.url.params
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_content_client_fallback(client):
+    # First call (with filters) returns 400 to trigger fallback; second call
+    # (without filters) succeeds
+    respx.get("https://mock-op.com/api/v3/work_packages").mock(
+        side_effect=lambda request: Response(400, json={"message": "Bad filter"})
+        if "filters" in request.url.params
+        else Response(
+            200,
+            json={
+                "_embedded": {"elements": [WP_SINGLE]},
+                "total": 1,
+            },
+        )
+    )
+
+    async with client:
+        result = await search_content(client, "Sample")
+
+    assert result["scope"] == "client_filtered_first_page"
+    assert result["items"][0]["id"] == 42
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_work_package_statuses_and_types(client):
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES)
+    )
+    respx.get("https://mock-op.com/api/v3/types").mock(
+        return_value=Response(200, json=TYPES)
+    )
+
+    async with client:
+        statuses = await get_work_package_statuses(client)
+        types = await get_work_package_types(client)
+
+    assert statuses[0]["name"] == "In Progress"
+    assert types[0]["name"] == "Bug"

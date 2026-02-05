@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
@@ -12,6 +13,8 @@ from openproject_mcp.models import (
 )
 from openproject_mcp.tools._collections import embedded_elements
 from openproject_mcp.tools.metadata import (
+    list_statuses,
+    list_types,
     resolve_priority_id,
     resolve_status_id,
     resolve_type_id,
@@ -222,3 +225,126 @@ async def update_status(
         f"/api/v3/work_packages/{data.id}", json=patch_body, tool="work_packages"
     )
     return _wp_to_summary(patched)
+
+
+async def add_comment(
+    client: OpenProjectClient, wp_id: int, comment: str
+) -> Dict[str, Any]:
+    """
+    Add a comment to a work package.
+    """
+    payload = {"comment": {"raw": comment}}
+    resp = await client.post(
+        f"/api/v3/work_packages/{wp_id}/activities",
+        json=payload,
+        tool="work_packages",
+    )
+
+    return {
+        "work_package_id": wp_id,
+        "comment": comment,
+        "activity_id": parse_id_from_href(get_link_href(resp, "self")),
+        "url": get_link_href(resp, "self"),
+    }
+
+
+async def append_work_package_description(
+    client: OpenProjectClient, wp_id: int, text: str
+) -> Dict[str, Any]:
+    """
+    Append text to the work package description, preserving lockVersion.
+    """
+    current = await client.get(f"/api/v3/work_packages/{wp_id}", tool="work_packages")
+    lock_version = current.get("lockVersion")
+    if lock_version is None:
+        raise OpenProjectHTTPError(
+            status_code=422,
+            method="GET",
+            url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
+            message="lockVersion missing from work package response",
+        )
+
+    existing = _description_raw_to_text(current.get("description"))
+    existing = existing.rstrip()
+    appended = text if not existing else f"{existing}\n\n{text}"
+
+    patch_body = {
+        "lockVersion": lock_version,
+        "description": {"raw": appended},
+    }
+
+    try:
+        updated = await client.patch(
+            f"/api/v3/work_packages/{wp_id}",
+            json=patch_body,
+            tool="work_packages",
+        )
+    except OpenProjectHTTPError as exc:
+        if exc.status_code == 409:
+            raise OpenProjectHTTPError(
+                status_code=409,
+                method="PATCH",
+                url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
+                message=(
+                    "Work package was updated by someone else; "
+                    "please reload and retry."
+                ),
+            ) from exc
+        raise
+
+    return _wp_to_summary(updated)
+
+
+async def search_content(client: OpenProjectClient, query: str) -> Dict[str, Any]:
+    """
+    Search work packages by text. Tries server-side filter first; falls back to
+    client-side filtering of the first page if the server rejects the filter.
+    """
+    params = {
+        "pageSize": MAX_PAGE_SIZE,
+        "filters": json.dumps([{"text": {"operator": "~", "values": [query]}}]),
+    }
+
+    scope = "server_filtered"
+    try:
+        payload = await client.get(
+            "/api/v3/work_packages", params=params, tool="work_packages"
+        )
+        elements = embedded_elements(payload)
+    except OpenProjectHTTPError as exc:
+        if exc.status_code in (400, 415, 422):
+            # Fallback: first page, client-side filter
+            fallback = await client.get(
+                "/api/v3/work_packages",
+                params={"pageSize": MAX_PAGE_SIZE},
+                tool="work_packages",
+            )
+            elements = embedded_elements(fallback)
+            needle = query.strip().casefold()
+
+            def matches(item: Dict[str, Any]) -> bool:
+                subject = str(item.get("subject", "")).casefold()
+                desc = _description_raw_to_text(item.get("description")).casefold()
+                return needle in subject or needle in desc
+
+            elements = [e for e in elements if matches(e)]
+            scope = "client_filtered_first_page"
+        else:
+            raise
+
+    summaries = [_wp_to_summary(e) for e in elements]
+    return {"items": summaries, "scope": scope, "page_size": MAX_PAGE_SIZE}
+
+
+async def get_work_package_statuses(client: OpenProjectClient) -> list[dict[str, Any]]:
+    """
+    Expose raw statuses for manual exploration.
+    """
+    return await list_statuses(client)
+
+
+async def get_work_package_types(client: OpenProjectClient) -> list[dict[str, Any]]:
+    """
+    Expose raw types for manual exploration.
+    """
+    return await list_types(client)
