@@ -8,7 +8,12 @@ when they need to be exposed for discovery/registration.
 # Keeping this file explicit to ensure the package is importable during tests.
 
 # Tool modules
-from .attachments import attach_file_to_wp, list_attachments
+from .attachments import (
+    attach_file_to_wp,
+    download_attachment,
+    get_attachment_content,
+    list_attachments,
+)
 from .memberships import get_project_memberships
 from .metadata import (
     AmbiguousResolutionError,
@@ -61,6 +66,8 @@ __all__ = [
     "list_projects",
     "attach_file_to_wp",
     "list_attachments",
+    "download_attachment",
+    "get_attachment_content",
     "get_project_memberships",
     "system_ping",
     "add_comment",
