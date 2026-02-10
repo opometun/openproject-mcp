@@ -8,6 +8,7 @@ when they need to be exposed for discovery/registration.
 # Keeping this file explicit to ensure the package is importable during tests.
 
 # Tool modules
+from .memberships import get_project_memberships
 from .metadata import (
     AmbiguousResolutionError,
     NotFoundResolutionError,
@@ -57,6 +58,7 @@ __all__ = [
     "resolve_project",
     "resolve_user",
     "list_projects",
+    "get_project_memberships",
     "system_ping",
     "add_comment",
     "list_work_packages",
