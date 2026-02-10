@@ -26,7 +26,7 @@ async def test_get_project_memberships_single_page(client):
         )
     )
 
-    respx.get("https://mock-op.com/api/v3/projects/5/memberships").mock(
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
         return_value=Response(
             200,
             json={
@@ -49,7 +49,7 @@ async def test_get_project_memberships_single_page(client):
     async with client:
         data = await get_project_memberships(client, "demo")
 
-    assert data["items"][0]["user_name"] == "Ada"
+    assert data["items"][0]["principal_name"] == "Ada"
     assert data["items"][0]["roles"] == ["Developer"]
     assert data["items"][0]["membership_id"] == 10
     assert data["total"] == 1
@@ -108,14 +108,14 @@ async def test_get_project_memberships_pagination(client):
             },
         )
 
-    respx.get("https://mock-op.com/api/v3/projects/5/memberships").mock(
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
         side_effect=memberships_responder
     )
 
     async with client:
         data = await get_project_memberships(client, "demo", page_size=1, max_pages=2)
 
-    assert {i["user_name"] for i in data["items"]} == {"Bob", "Cara"}
+    assert {i["principal_name"] for i in data["items"]} == {"Bob", "Cara"}
     assert data["pages_scanned"] == 2
     assert data["scanned"] == 2
 
@@ -136,7 +136,7 @@ async def test_get_project_memberships_links_fallback(client):
         )
     )
 
-    respx.get("https://mock-op.com/api/v3/projects/5/memberships").mock(
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
         return_value=Response(
             200,
             json={
@@ -145,7 +145,7 @@ async def test_get_project_memberships_links_fallback(client):
                         {
                             "_links": {
                                 "self": {"href": "/api/v3/memberships/20"},
-                                "user": {
+                                "principal": {
                                     "href": "/api/v3/users/15",
                                     "title": "Dana",
                                 },
@@ -163,8 +163,8 @@ async def test_get_project_memberships_links_fallback(client):
     async with client:
         data = await get_project_memberships(client, "demo")
 
-    assert data["items"][0]["user_id"] == 15
-    assert data["items"][0]["user_name"] == "Dana"
+    assert data["items"][0]["principal_id"] == 15
+    assert data["items"][0]["principal_name"] == "Dana"
     assert data["items"][0]["roles"] == ["Viewer"]
     assert data["items"][0]["membership_id"] == 20
 
@@ -185,10 +185,58 @@ async def test_get_project_memberships_permission_error(client):
         )
     )
 
-    respx.get("https://mock-op.com/api/v3/projects/5/memberships").mock(
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
         return_value=Response(403, json={"message": "forbidden"})
     )
 
     async with client:
         with pytest.raises(OpenProjectHTTPError):
             await get_project_memberships(client, "demo")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_project_memberships_group_principal(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {"id": 5, "name": "Demo", "identifier": "demo"},
+                    ]
+                }
+            },
+        )
+    )
+
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {
+                            "_links": {
+                                "self": {"href": "/api/v3/memberships/30"},
+                                "principal": {
+                                    "href": "/api/v3/groups/99",
+                                    "title": "QA Team",
+                                },
+                                "roles": [
+                                    {"href": "/api/v3/roles/1", "title": "Viewer"},
+                                ],
+                            }
+                        }
+                    ]
+                }
+            },
+        )
+    )
+
+    async with client:
+        data = await get_project_memberships(client, "demo")
+
+    assert data["items"][0]["principal_type"] == "Group"
+    assert data["items"][0]["principal_id"] == 99
+    assert data["items"][0]["principal_name"] == "QA Team"

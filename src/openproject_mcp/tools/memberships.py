@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
@@ -14,30 +15,41 @@ def _clamp_page_size(page_size: int) -> int:
     return max(1, min(page_size, MAX_PAGE_SIZE))
 
 
-def _user_from_membership(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
-    user_emb = (
-        item.get("_embedded", {}).get("user", {}) if isinstance(item, dict) else {}
+def _principal_from_membership(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
+    principal_link = (
+        item.get("_links", {}).get("principal", {}) if isinstance(item, dict) else {}
     )
-    user_links = (
-        item.get("_links", {}).get("user", {}) if isinstance(item, dict) else {}
-    )
+    href = principal_link.get("href")
+    name = principal_link.get("title")
+    principal_id = None
+    principal_type = None
 
-    user_id = user_emb.get("id")
-    user_name = user_emb.get("name")
-    user_href = None
-
-    href = user_links.get("href")
     if href:
-        user_href = href
-        if user_id is None:
-            user_id = parse_id_from_href(href)
-    if user_name is None and isinstance(user_links, dict):
-        user_name = user_links.get("title")
+        principal_id = parse_id_from_href(href)
+        # crude type inference from path segments
+        if "/users/" in href:
+            principal_type = "User"
+        elif "/groups/" in href:
+            principal_type = "Group"
+
+    # Fallback to embedded user when principal link is absent or title missing
+    if (href is None or name is None) and isinstance(item, dict):
+        user_emb = item.get("_embedded", {}).get("user", {})
+        if isinstance(user_emb, dict):
+            if principal_id is None:
+                principal_id = user_emb.get("id")
+            if name is None:
+                name = user_emb.get("name")
+            if href is None and user_emb.get("_links", {}):
+                href = user_emb.get("_links", {}).get("self", {}).get("href")
+            if principal_type is None:
+                principal_type = "User" if user_emb else None
 
     return {
-        "id": user_id,
-        "name": user_name,
-        "href": user_href,
+        "id": principal_id,
+        "name": name,
+        "href": href,
+        "type": principal_type,
     }
 
 
@@ -78,12 +90,17 @@ async def get_project_memberships(
     items: List[Dict[str, Any]] = []
     offset = 0
     pages_scanned = 0
+    filters = [{"project": {"operator": "=", "values": [str(project_id)]}}]
 
     for _ in range(max_pages):
         try:
             payload = await client.get(
-                f"/api/v3/projects/{project_id}/memberships",
-                params={"offset": offset, "pageSize": page_size},
+                "/api/v3/memberships",
+                params={
+                    "offset": offset,
+                    "pageSize": page_size,
+                    "filters": json.dumps(filters),
+                },
                 tool="memberships",
             )
         except OpenProjectHTTPError as exc:
@@ -91,7 +108,7 @@ async def get_project_memberships(
                 raise OpenProjectHTTPError(
                     status_code=403,
                     method="GET",
-                    url=f"{client.base_url}/api/v3/projects/{project_id}/memberships",
+                    url=f"{client.base_url}/api/v3/memberships",
                     message="Permission denied: unable to view project memberships.",
                 ) from exc
             raise
@@ -106,15 +123,16 @@ async def get_project_memberships(
                     else ""
                 )
 
-            user = _user_from_membership(m if isinstance(m, dict) else {})
+            principal = _principal_from_membership(m if isinstance(m, dict) else {})
             roles = _roles_from_membership(m if isinstance(m, dict) else {})
 
             items.append(
                 {
                     "membership_id": membership_id,
-                    "user_id": user["id"],
-                    "user_name": user["name"],
-                    "user_href": user["href"],
+                    "principal_id": principal["id"],
+                    "principal_name": principal["name"],
+                    "principal_href": principal["href"],
+                    "principal_type": principal["type"],
                     "roles": roles,
                 }
             )
