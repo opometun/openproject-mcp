@@ -34,7 +34,7 @@ from .metadata import (
 )
 from .projects import list_projects
 from .system import system_ping
-from .time_entries import log_time
+from .time_entries import get_my_logged_time, list_time_entries, log_time
 from .work_packages import (
     add_comment,
     append_work_package_description,
@@ -80,4 +80,6 @@ __all__ = [
     "create_work_package",
     "update_status",
     "log_time",
+    "list_time_entries",
+    "get_my_logged_time",
 ]

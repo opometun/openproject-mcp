@@ -5,7 +5,11 @@ import pytest
 import respx
 from httpx import Response
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools.time_entries import log_time
+from openproject_mcp.tools.time_entries import (
+    get_my_logged_time,
+    list_time_entries,
+    log_time,
+)
 from openproject_mcp.utils.time_parser import DurationParseError, parse_duration_string
 
 # --- Parser tests ---
@@ -90,3 +94,113 @@ async def test_log_time_404_propagates(client):
     async with client:
         with pytest.raises(OpenProjectHTTPError):
             await log_time(client, work_package_id=123, duration="2h")
+
+
+# --- list_time_entries tests ---
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_time_entries_defaults_to_me(client):
+    respx.get("https://mock-op.com/api/v3/users/me").mock(
+        return_value=Response(200, json={"id": 7, "name": "Me"})
+    )
+    route = respx.get("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(
+            200,
+            json={
+                "total": 1,
+                "_embedded": {
+                    "elements": [
+                        {
+                            "id": 1,
+                            "hours": "PT1H30M",
+                            "spentOn": "2024-01-02",
+                            "comment": {"raw": "hi"},
+                            "_links": {
+                                "user": {"href": "/api/v3/users/7", "title": "Me"},
+                                "project": {
+                                    "href": "/api/v3/projects/5",
+                                    "title": "Demo",
+                                },
+                                "workPackage": {
+                                    "href": "/api/v3/work_packages/9",
+                                    "title": "WP",
+                                },
+                            },
+                        }
+                    ]
+                },
+            },
+        )
+    )
+
+    async with client:
+        data = await list_time_entries(client)
+
+    # filter sent
+    params = route.calls[0].request.url.params
+    filters = json.loads(params["filters"])
+    assert filters[0]["user"]["values"] == ["7"]
+
+    item = data["items"][0]
+    assert item["hours_iso"] == "PT1H30M"
+    assert item["minutes"] == 90
+    assert item["hours_decimal"] == 1.5
+    assert item["user"]["id"] == 7
+    assert data["total"] == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_time_entries_with_filters(client):
+    respx.get("https://mock-op.com/api/v3/users/me").mock(
+        return_value=Response(200, json={"id": 7, "name": "Me"})
+    )
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [{"id": 5, "name": "Demo", "identifier": "demo"}]
+                }
+            },
+        )
+    )
+    route = respx.get("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(
+            200,
+            json={"total": 0, "_embedded": {"elements": []}},
+        )
+    )
+
+    async with client:
+        await list_time_entries(
+            client,
+            project="demo",
+            work_package=9,
+            spent_from=date(2024, 1, 1),
+            spent_to="2024-01-31",
+        )
+
+    filters = json.loads(route.calls[0].request.url.params["filters"])
+    assert {"project": {"operator": "=", "values": ["5"]}} in filters
+    assert {"workPackage": {"operator": "=", "values": ["9"]}} in filters
+    assert {"spentOn": {"operator": ">=", "values": ["2024-01-01"]}} in filters
+    assert {"spentOn": {"operator": "<=", "values": ["2024-01-31"]}} in filters
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_my_logged_time_wrapper(client):
+    respx.get("https://mock-op.com/api/v3/users/me").mock(
+        return_value=Response(200, json={"id": 7, "name": "Me"})
+    )
+    respx.get("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(200, json={"_embedded": {"elements": []}, "total": 0})
+    )
+
+    async with client:
+        data = await get_my_logged_time(client)
+
+    assert data["items"] == []
