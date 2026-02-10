@@ -14,7 +14,10 @@ from .metadata import (
     list_types,
     resolve_metadata_id,
     resolve_priority_id,
+    resolve_status,
     resolve_status_id,
+    resolve_type,
+    resolve_type_for_project,
     resolve_type_id,
 )
 from .projects import list_projects
@@ -40,6 +43,9 @@ __all__ = [
     "resolve_type_id",
     "resolve_status_id",
     "resolve_priority_id",
+    "resolve_type",
+    "resolve_status",
+    "resolve_type_for_project",
     "list_projects",
     "system_ping",
     "add_comment",

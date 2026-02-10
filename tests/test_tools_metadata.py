@@ -4,11 +4,16 @@ from httpx import Response
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.tools import metadata
 from openproject_mcp.tools.metadata import (
+    AmbiguousResolutionError,
+    NotFoundResolutionError,
     list_priorities,
     list_statuses,
     list_types,
     resolve_priority_id,
+    resolve_status,
     resolve_status_id,
+    resolve_type,
+    resolve_type_for_project,
     resolve_type_id,
 )
 
@@ -38,6 +43,15 @@ PRIORITIES_PAYLOAD = {
         "elements": [
             {"id": 5, "name": "Normal"},
             {"id": 6, "name": "High"},
+        ]
+    },
+}
+
+PROJECT_TYPES_PAYLOAD = {
+    "_type": "Collection",
+    "_embedded": {
+        "elements": [
+            {"id": 2, "name": "Task"},
         ]
     },
 }
@@ -122,6 +136,81 @@ async def test_resolve_status_id_substring_fallback(client):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_resolve_status_alias(client):
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES_PAYLOAD)
+    )
+
+    async with client:
+        assert await resolve_status(client, "new") == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_type_alias_case_insensitive(client):
+    respx.get("https://mock-op.com/api/v3/types").mock(
+        return_value=Response(200, json=TYPES_PAYLOAD)
+    )
+
+    async with client:
+        assert await resolve_type(client, "bug") == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_type_for_project_uses_project_types(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {"id": 999, "name": "Demo", "identifier": "demo"},
+                    ]
+                }
+            },
+        )
+    )
+    respx.get("https://mock-op.com/api/v3/projects/999/types").mock(
+        return_value=Response(200, json=PROJECT_TYPES_PAYLOAD)
+    )
+
+    async with client:
+        result = await resolve_type_for_project(client, "demo", "Task")
+
+    assert result == 2
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_type_for_project_fallback_to_global(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {"id": 999, "name": "Demo", "identifier": "demo"},
+                    ]
+                }
+            },
+        )
+    )
+    respx.get("https://mock-op.com/api/v3/projects/999/types").mock(
+        return_value=Response(404, json={"message": "Not found"})
+    )
+    respx.get("https://mock-op.com/api/v3/types").mock(
+        return_value=Response(200, json=TYPES_PAYLOAD)
+    )
+
+    async with client:
+        result = await resolve_type_for_project(client, "demo", "Task")
+
+    assert result == 2
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_resolve_status_id_ambiguous_raises_error(client):
     respx.get("https://mock-op.com/api/v3/statuses").mock(
         return_value=Response(
@@ -138,7 +227,7 @@ async def test_resolve_status_id_ambiguous_raises_error(client):
     )
 
     async with client:
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(AmbiguousResolutionError) as exc:
             await resolve_status_id(client, "Progress")
 
     assert "Ambiguous match" in str(exc.value)
@@ -154,7 +243,7 @@ async def test_resolve_priority_id_not_found_lists_available(client):
     )
 
     async with client:
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(NotFoundResolutionError) as exc:
             await resolve_priority_id(client, "Urgent")
 
     assert "Available" in str(exc.value)
