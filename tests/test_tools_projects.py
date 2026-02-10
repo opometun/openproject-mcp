@@ -9,8 +9,8 @@ PROJECTS_PAYLOAD = {
     "total": 3,
     "_embedded": {
         "elements": [
-            {"id": 1, "name": "Alpha"},
-            {"id": 2, "name": "Beta"},
+            {"id": 1, "name": "Alpha", "identifier": "alpha"},
+            {"id": 2, "name": "Beta", "identifier": "beta"},
         ]
     },
 }
@@ -41,7 +41,10 @@ async def test_list_projects_returns_items_and_paging(client):
     async with client:
         result = await list_projects(client)
 
-    assert result["items"] == [{"id": 1, "name": "Alpha"}, {"id": 2, "name": "Beta"}]
+    assert result["items"] == [
+        {"id": 1, "name": "Alpha", "identifier": None},
+        {"id": 2, "name": "Beta", "identifier": None},
+    ]
     assert result["offset"] == 0
     assert result["page_size"] == 50
     assert result["total"] == 120
@@ -70,7 +73,10 @@ async def test_next_offset_none_at_end(client):
         "_type": "Collection",
         "total": 2,
         "_embedded": {
-            "elements": [{"id": 1, "name": "Alpha"}, {"id": 2, "name": "Beta"}]
+            "elements": [
+                {"id": 1, "name": "Alpha", "identifier": "alpha"},
+                {"id": 2, "name": "Beta", "identifier": "beta"},
+            ]
         },
     }
     respx.get("https://mock-op.com/api/v3/projects").mock(
@@ -81,6 +87,7 @@ async def test_next_offset_none_at_end(client):
         result = await list_projects(client, offset=0, page_size=2)
 
     assert result["next_offset"] is None
+    assert result["items"][0]["identifier"] == "alpha"
 
 
 @pytest.mark.asyncio
@@ -93,7 +100,7 @@ async def test_name_contains_filters_client_side(client):
     async with client:
         result = await list_projects(client, name_contains="alp")
 
-    assert result["items"] == [{"id": 1, "name": "Alpha"}]
+    assert result["items"] == [{"id": 1, "name": "Alpha", "identifier": "alpha"}]
     # total remains based on payload (3), even though items filtered client-side
     assert result["total"] == 3
 

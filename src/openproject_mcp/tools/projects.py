@@ -60,7 +60,9 @@ async def list_projects(
         next_offset = offset + page_size
 
     return {
-        "items": [{"id": p.id, "name": p.name} for p in projects],
+        "items": [
+            {"id": p.id, "name": p.name, "identifier": p.identifier} for p in projects
+        ],
         "offset": offset,
         "page_size": page_size,
         "total": total,
