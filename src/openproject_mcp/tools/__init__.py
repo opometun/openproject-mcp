@@ -9,16 +9,21 @@ when they need to be exposed for discovery/registration.
 
 # Tool modules
 from .metadata import (
+    AmbiguousResolutionError,
+    NotFoundResolutionError,
+    ResolutionError,
     list_priorities,
     list_statuses,
     list_types,
     resolve_metadata_id,
     resolve_priority_id,
+    resolve_project,
     resolve_status,
     resolve_status_id,
     resolve_type,
     resolve_type_for_project,
     resolve_type_id,
+    resolve_user,
 )
 from .projects import list_projects
 from .system import system_ping
@@ -39,6 +44,9 @@ __all__ = [
     "list_types",
     "list_statuses",
     "list_priorities",
+    "ResolutionError",
+    "AmbiguousResolutionError",
+    "NotFoundResolutionError",
     "resolve_metadata_id",
     "resolve_type_id",
     "resolve_status_id",
@@ -46,6 +54,8 @@ __all__ = [
     "resolve_type",
     "resolve_status",
     "resolve_type_for_project",
+    "resolve_project",
+    "resolve_user",
     "list_projects",
     "system_ping",
     "add_comment",

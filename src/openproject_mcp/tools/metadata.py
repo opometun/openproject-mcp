@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Type, TypeVar
 from pydantic import BaseModel
 
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.models import PriorityRef, ProjectRef, StatusRef, TypeRef
+from openproject_mcp.models import PriorityRef, ProjectRef, StatusRef, TypeRef, UserRef
 from openproject_mcp.tools._collections import embedded_elements
 
 T = TypeVar("T", bound=BaseModel)
@@ -176,11 +176,37 @@ async def _fetch_project_types(
     return [TypeRef.model_validate(e) for e in elements]
 
 
+async def _fetch_paginated_items(
+    client: OpenProjectClient,
+    endpoint: str,
+    model: Type[T],
+    *,
+    max_pages: int,
+    page_size: int = MAX_PROJECT_PAGE_SIZE,
+    tool: str = "metadata",
+) -> list[T]:
+    items: list[T] = []
+    offset = 0
+    for _ in range(max_pages):
+        payload = await client.get(
+            endpoint,
+            params={"offset": offset, "pageSize": page_size},
+            tool=tool,
+        )
+        elements = embedded_elements(payload)
+        batch: List[T] = [model.model_validate(e) for e in elements]
+        items.extend(batch)
+        offset += page_size
+        if not batch:
+            break
+    return items
+
+
 # --- Resolve-by-name helpers ---
 
 
-def _norm(s: str) -> str:
-    return s.strip().casefold()
+def _norm(s: Optional[str]) -> str:
+    return (s or "").strip().casefold()
 
 
 def _sorted_names(items: list[BaseModel]) -> list[str]:
@@ -222,6 +248,89 @@ def _resolve_from_items(name_query: str, items: list[BaseModel]) -> int:
     raise NotFoundResolutionError(
         f"Could not find '{name_query}'. Available options: {', '.join(available)}",
         query=name_query,
+        available=available,
+    )
+
+
+def _resolve_project_from_items(query: str, items: list[ProjectRef]) -> int:
+    q = _norm(query)
+
+    # exact identifier
+    for p in items:
+        if _norm(getattr(p, "identifier", "")) == q:
+            return int(p.id)
+    # exact name
+    for p in items:
+        if _norm(getattr(p, "name", "")) == q:
+            return int(p.id)
+
+    matches = []
+    for p in items:
+        ident = _norm(getattr(p, "identifier", ""))
+        name = _norm(getattr(p, "name", ""))
+        if q in ident or q in name:
+            matches.append(p)
+
+    if len(matches) == 1:
+        return int(matches[0].id)
+
+    if len(matches) > 1:
+        sorted_matches = sorted(matches, key=lambda p: (_norm(p.name), p.id))
+        candidates = [
+            f"{p.name} (ID: {p.id}, identifier: {p.identifier})" for p in sorted_matches
+        ]
+        raise AmbiguousResolutionError(
+            f"Project '{query}' is ambiguous. Found: {', '.join(candidates)}.",
+            query=query,
+            candidates=[p.name for p in sorted_matches],
+        )
+
+    available = sorted([p.name for p in items], key=_norm)
+    raise NotFoundResolutionError(
+        f"Project '{query}' not found after limited search. Available (searched): {', '.join(available)}",  # noqa: E501
+        query=query,
+        available=available,
+    )
+
+
+def _resolve_user_from_items(query: str, items: list[UserRef]) -> int:
+    q = _norm(query)
+
+    def fields(u: UserRef) -> list[str]:
+        return [
+            _norm(getattr(u, "name", "")),
+            _norm(getattr(u, "login", "")),
+            _norm(getattr(u, "mail", "")),
+        ]
+
+    # exact on name
+    for u in items:
+        if _norm(getattr(u, "name", "")) == q:
+            return int(u.id)
+
+    matches = []
+    for u in items:
+        if any(q in f for f in fields(u) if f):
+            matches.append(u)
+
+    if len(matches) == 1:
+        return int(matches[0].id)
+
+    if len(matches) > 1:
+        sorted_matches = sorted(matches, key=lambda u: (_norm(u.name), u.id))
+        candidates = [
+            f"{u.name} (ID: {u.id}, login: {u.login})" for u in sorted_matches
+        ]
+        raise AmbiguousResolutionError(
+            f"User '{query}' is ambiguous. Found: {', '.join(candidates)}.",
+            query=query,
+            candidates=[u.name for u in sorted_matches],
+        )
+
+    available = sorted([u.name for u in items], key=_norm)
+    raise NotFoundResolutionError(
+        f"User '{query}' not found after limited search. Available (searched): {', '.join(available)}",  # noqa: E501
+        query=query,
         available=available,
     )
 
@@ -285,3 +394,53 @@ async def resolve_type_for_project(
     else:
         items = project_types
     return _resolve_from_items(type_name, items)
+
+
+async def resolve_project(
+    client: OpenProjectClient, project_query: str, *, max_pages: int = 3
+) -> int:
+    """
+    Resolve a project ID by identifier or name (case-insensitive).
+    Searches up to max_pages of projects (pageSize=200). Notes: results are limited to searched pages.
+    """  # noqa: E501
+    items = await _fetch_paginated_items(
+        client,
+        "/api/v3/projects",
+        ProjectRef,
+        max_pages=max_pages,
+        page_size=MAX_PROJECT_PAGE_SIZE,
+        tool="metadata",
+    )
+    return _resolve_project_from_items(project_query, items)
+
+
+async def resolve_user(
+    client: OpenProjectClient, user_query: str, *, max_pages: int = 3
+) -> int:
+    """
+    Resolve a user ID by name/login/mail (case-insensitive).
+    Searches up to max_pages of users (pageSize=200). May require permissions to list users.
+    """  # noqa: E501
+    try:
+        items = await _fetch_paginated_items(
+            client,
+            "/api/v3/users",
+            UserRef,
+            max_pages=max_pages,
+            page_size=MAX_PROJECT_PAGE_SIZE,
+            tool="metadata",
+        )
+    except OpenProjectHTTPError as exc:
+        if exc.status_code in (401, 403):
+            raise ResolutionError(
+                "User listing unavailable: insufficient permissions.",
+                query=user_query,
+            ) from exc
+        if exc.status_code in (404, 405, 501):
+            raise ResolutionError(
+                "User listing endpoint not available on this OpenProject instance.",
+                query=user_query,
+            ) from exc
+        raise
+
+    return _resolve_user_from_items(user_query, items)

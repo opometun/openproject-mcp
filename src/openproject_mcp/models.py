@@ -80,6 +80,15 @@ class StatusRef(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class UserRef(BaseModel):
+    id: int
+    name: str
+    login: Optional[str] = None
+    mail: Optional[str] = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
 class ProjectRef(BaseModel):
     id: int
     name: str
