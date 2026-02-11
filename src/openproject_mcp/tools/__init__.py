@@ -47,6 +47,7 @@ from .work_packages import (
     list_work_packages,
     search_content,
     update_status,
+    update_work_package,
 )
 
 __all__ = [
@@ -83,6 +84,7 @@ __all__ = [
     "get_work_package_types",
     "create_work_package",
     "update_status",
+    "update_work_package",
     "log_time",
     "list_time_entries",
     "get_my_logged_time",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Dict, Optional, Type, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -112,6 +113,24 @@ class WorkPackageCreateInput(BaseModel):
 class WorkPackageUpdateStatusInput(BaseModel):
     id: int
     status: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class WorkPackageUpdateInput(BaseModel):
+    id: int
+    subject: Optional[str] = None
+    description: Optional[str] = None
+    append_description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    assignee: Optional[Any] = None  # id/int/str/None to clear
+    start_date: Optional[date | str] = None
+    due_date: Optional[date | str] = None
+    percent_done: Optional[int] = None
+    estimated_time: Optional[str] = None  # ISO 8601 preferred
+    type: Optional[str] = None
+    project: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
 

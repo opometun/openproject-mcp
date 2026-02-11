@@ -5,7 +5,11 @@ import pytest
 import respx
 from httpx import Response
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.models import WorkPackageCreateInput, WorkPackageUpdateStatusInput
+from openproject_mcp.models import (
+    WorkPackageCreateInput,
+    WorkPackageUpdateInput,
+    WorkPackageUpdateStatusInput,
+)
 from openproject_mcp.tools.work_packages import (
     add_comment,
     append_work_package_description,
@@ -16,6 +20,7 @@ from openproject_mcp.tools.work_packages import (
     list_work_packages,
     search_content,
     update_status,
+    update_work_package,
 )
 
 WP_SINGLE = {
@@ -55,7 +60,12 @@ PRIORITIES = {
 
 STATUSES = {
     "_type": "Collection",
-    "_embedded": {"elements": [{"id": 7, "name": "In Progress", "isClosed": False}]},
+    "_embedded": {
+        "elements": [
+            {"id": 7, "name": "In Progress", "isClosed": False},
+            {"id": 8, "name": "Closed", "isClosed": True},
+        ]
+    },
 }
 
 
@@ -350,3 +360,144 @@ async def test_get_work_package_statuses_and_types(client):
 
     assert statuses[0]["name"] == "In Progress"
     assert types[0]["name"] == "Bug"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_multi_field(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES)
+    )
+    respx.get("https://mock-op.com/api/v3/priorities").mock(
+        return_value=Response(200, json=PRIORITIES)
+    )
+
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(
+            200,
+            json={
+                **WP_SINGLE,
+                "subject": "Renamed",
+                "_links": {
+                    **WP_SINGLE["_links"],
+                    "assignee": {"href": "/api/v3/users/9", "title": "Bob"},
+                },
+            },
+        )
+    )
+
+    async with client:
+        summary = await update_work_package(
+            client,
+            WorkPackageUpdateInput(
+                id=42,
+                subject="Renamed",
+                status="In Progress",
+                priority="High",
+                assignee=9,
+                percent_done=50,
+            ),
+        )
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["lockVersion"] == 3
+    assert body["subject"] == "Renamed"
+    assert body["percentageDone"] == 50
+    assert body["_links"]["assignee"]["href"] == "/api/v3/users/9"
+    assert summary["subject"] == "Renamed"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_append_description(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(
+            200,
+            json={**WP_SINGLE, "description": {"raw": "Hello"}, "lockVersion": 3},
+        )
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(
+            200,
+            json={
+                **WP_SINGLE,
+                "description": {"raw": "Hello\n\nMore"},
+                "lockVersion": 4,
+            },
+        )
+    )
+
+    async with client:
+        await update_work_package(
+            client, WorkPackageUpdateInput(id=42, append_description="More")
+        )
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["description"]["raw"] == "Hello\n\nMore"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_clear_assignee(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(client, WorkPackageUpdateInput(id=42, assignee=None))
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["_links"]["assignee"]["href"] is None
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_conflict_message(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(409, json={"message": "Conflict"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError) as excinfo:
+            await update_work_package(
+                client, WorkPackageUpdateInput(id=42, subject="X")
+            )
+
+    assert "lockVersion" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_422_message(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES)
+    )
+    respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(
+            422,
+            json={
+                "_embedded": {"errors": [{"message": "Status not allowed"}]},
+                "message": "Validation failed",
+            },
+        )
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError) as excinfo:
+            await update_work_package(
+                client, WorkPackageUpdateInput(id=42, status="Closed")
+            )
+
+    assert "Status not allowed" in str(excinfo.value)

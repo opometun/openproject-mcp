@@ -9,6 +9,7 @@ from openproject_mcp.models import (
     ProjectRef,
     WorkPackage,
     WorkPackageCreateInput,
+    WorkPackageUpdateInput,
     WorkPackageUpdateStatusInput,
 )
 from openproject_mcp.tools._collections import embedded_elements
@@ -17,8 +18,11 @@ from openproject_mcp.tools.metadata import (
     list_types,
     resolve_priority_id,
     resolve_status_id,
+    resolve_type_for_project,
     resolve_type_id,
+    resolve_user,
 )
+from openproject_mcp.utils.time_parser import DurationParseError, parse_duration_string
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -228,6 +232,159 @@ async def update_status(
     patched = await client.patch(
         f"/api/v3/work_packages/{data.id}", json=patch_body, tool="work_packages"
     )
+    return _wp_to_summary(patched)
+
+
+async def update_work_package(
+    client: OpenProjectClient, data: WorkPackageUpdateInput
+) -> Dict[str, Any]:
+    """
+    Update multiple attributes of a work package in a single call.
+    Supports subject, description (replace or append), status, priority, assignee,
+    start/due dates, percentage done, estimated time, type, and project.
+    Only provided fields are changed; others are left untouched.
+    """
+    if data.description is not None and data.append_description is not None:
+        raise ValueError("Provide either description or append_description, not both.")
+
+    current = await client.get(f"/api/v3/work_packages/{data.id}", tool="work_packages")
+    lock_version = current.get("lockVersion")
+    if lock_version is None:
+        raise OpenProjectHTTPError(
+            status_code=422,
+            method="GET",
+            url=f"{client.base_url}/api/v3/work_packages/{data.id}",
+            message="lockVersion missing from work package response",
+        )
+
+    payload: Dict[str, Any] = {"lockVersion": lock_version}
+    links: Dict[str, Any] = {}
+
+    if data.subject is not None:
+        payload["subject"] = data.subject
+
+    if data.description is not None:
+        payload["description"] = {"raw": data.description}
+    elif data.append_description is not None:
+        existing = _description_raw_to_text(current.get("description"))
+        existing = existing.rstrip()
+        combined = (
+            data.append_description
+            if not existing
+            else f"{existing}\n\n{data.append_description}"
+        )
+        payload["description"] = {"raw": combined}
+
+    if data.start_date is not None:
+        payload["startDate"] = (
+            data.start_date.isoformat()
+            if hasattr(data.start_date, "isoformat")
+            else str(data.start_date)
+        )
+    if data.due_date is not None:
+        payload["dueDate"] = (
+            data.due_date.isoformat()
+            if hasattr(data.due_date, "isoformat")
+            else str(data.due_date)
+        )
+
+    if data.percent_done is not None:
+        if not (0 <= data.percent_done <= 100):
+            raise ValueError("percent_done must be between 0 and 100.")
+        payload["percentageDone"] = data.percent_done
+
+    if data.estimated_time is not None:
+        iso_duration = data.estimated_time
+        if not (isinstance(iso_duration, str) and iso_duration.startswith("PT")):
+            try:
+                iso_duration = parse_duration_string(str(data.estimated_time))
+            except DurationParseError as exc:
+                raise ValueError(str(exc)) from exc
+        payload["estimatedTime"] = iso_duration
+
+    # Resolve links
+    if data.status is not None:
+        status_id = await resolve_status_id(client, data.status)
+        links["status"] = {"href": f"/api/v3/statuses/{status_id}"}
+
+    if data.priority is not None:
+        priority_id = await resolve_priority_id(client, data.priority)
+        links["priority"] = {"href": f"/api/v3/priorities/{priority_id}"}
+
+    # Resolve assignee: only act if the field was provided; None clears
+    if "assignee" in data.model_fields_set:
+        if data.assignee is None:
+            links["assignee"] = {"href": None}
+        else:
+            if isinstance(data.assignee, int):
+                assignee_id = data.assignee
+            elif isinstance(data.assignee, str) and data.assignee.strip().isdigit():
+                assignee_id = int(data.assignee.strip())
+            else:
+                assignee_id = await resolve_user(client, str(data.assignee))
+            links["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
+
+    # Resolve type with project context when possible
+    if data.type is not None:
+        project_href = get_link_href(current, "project")
+        project_id = parse_id_from_href(project_href)
+        try:
+            if project_id is not None:
+                type_id = await resolve_type_for_project(client, project_id, data.type)
+            else:
+                type_id = await resolve_type_id(client, data.type)
+        except Exception:
+            type_id = await resolve_type_id(client, data.type)
+        links["type"] = {"href": f"/api/v3/types/{type_id}"}
+
+    if data.project is not None:
+        project_id = await _resolve_project_id(client, data.project)
+        links["project"] = {"href": f"/api/v3/projects/{project_id}"}
+
+    if links:
+        payload["_links"] = links
+
+    try:
+        patched = await client.patch(
+            f"/api/v3/work_packages/{data.id}", json=payload, tool="work_packages"
+        )
+    except OpenProjectHTTPError as exc:
+        if exc.status_code == 409:
+            raise OpenProjectHTTPError(
+                status_code=409,
+                method="PATCH",
+                url=f"{client.base_url}/api/v3/work_packages/{data.id}",
+                message="Update conflict: lockVersion is outdated. Re-fetch and retry.",
+                response_json=exc.response_json,
+                response_text=exc.response_text,
+            ) from exc
+        if exc.status_code == 422:
+            message = "Validation failed."
+            if isinstance(exc.response_json, dict):
+                errors = (
+                    exc.response_json.get("_embedded", {}).get("errors", [])
+                    if isinstance(exc.response_json.get("_embedded", {}), dict)
+                    else []
+                )
+                messages = [
+                    e.get("message")
+                    for e in errors
+                    if isinstance(e, dict) and e.get("message")
+                ]
+                if messages:
+                    message = "Validation failed: " + "; ".join(messages)
+                elif exc.response_json.get("message"):
+                    message = exc.response_json.get("message")
+            raise OpenProjectHTTPError(
+                status_code=422,
+                method="PATCH",
+                url=f"{client.base_url}/api/v3/work_packages/{data.id}",
+                message=message,
+                response_json=exc.response_json,
+                response_text=exc.response_text,
+            ) from exc
+        raise
+
     return _wp_to_summary(patched)
 
 
