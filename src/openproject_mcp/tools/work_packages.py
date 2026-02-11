@@ -88,6 +88,154 @@ def _wp_to_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _norm_text(val: Optional[str]) -> str:
+    if not isinstance(val, str):
+        return ""
+    # collapse internal whitespace for resilient matching
+    return " ".join(val.split()).strip().casefold()
+
+
+def _collect_available_assignees(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    elements = embedded_elements(payload)
+    principals: List[Dict[str, Any]] = []
+    for el in elements:
+        if not isinstance(el, dict):
+            continue
+        name = el.get("name") or el.get("fullName")
+        href = get_link_href(el, "self") or el.get("_links", {}).get("self", {}).get(
+            "href"
+        )
+        principal_id = parse_id_from_href(href) or el.get("id")
+        principals.append(
+            {
+                "id": principal_id,
+                "name": name,
+                "href": href,
+                "login": el.get("login"),
+                "mail": el.get("mail"),
+            }
+        )
+    return principals
+
+
+def _collect_membership_principals(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    elements = embedded_elements(payload)
+    principals: List[Dict[str, Any]] = []
+    for el in elements:
+        if not isinstance(el, dict):
+            continue
+        principal_link = el.get("_links", {}).get("principal", {})
+        name = principal_link.get("title")
+        href = principal_link.get("href")
+        principal_id = parse_id_from_href(href)
+        principals.append({"id": principal_id, "name": name, "href": href})
+    return principals
+
+
+def _match_principal(name_query: str, principals: List[Dict[str, Any]]) -> int:
+    q = _norm_text(name_query)
+    exact = [p for p in principals if _norm_text(p.get("name")) == q]
+    if len(exact) == 1 and exact[0].get("id") is not None:
+        return int(exact[0]["id"])
+    # partial matches
+    partial = [p for p in principals if q and q in _norm_text(p.get("name"))]
+    if len(partial) == 1 and partial[0].get("id") is not None:
+        return int(partial[0]["id"])
+    if len(exact) > 1 or len(partial) > 1:
+        raise ValueError(
+            f"Name '{name_query}' is ambiguous; please specify a numeric user id."
+        )
+    raise ValueError(f"User '{name_query}' not found; provide a numeric user id.")
+
+
+async def _fetch_available_assignees_list(
+    client: OpenProjectClient, wp_payload: Dict[str, Any]
+) -> Optional[List[Dict[str, Any]]]:
+    href = get_link_href(wp_payload, "availableAssignees")
+    if not href:
+        return None
+
+    principals: List[Dict[str, Any]] = []
+    offset = 1
+    while True:
+        resp = await client.get(href, params={"offset": offset}, tool="work_packages")
+        principals.extend(_collect_available_assignees(resp))
+        total = resp.get("total") if isinstance(resp, dict) else None
+        page_size = resp.get("pageSize") if isinstance(resp, dict) else None
+        if not (isinstance(total, int) and isinstance(page_size, int)):
+            break
+        if offset * page_size >= total:
+            break
+        offset += 1
+
+    return principals
+
+
+async def _fetch_project_membership_principals(
+    client: OpenProjectClient, project_id: int
+) -> List[Dict[str, Any]]:
+    principals: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = MAX_PAGE_SIZE
+    filters = json.dumps([{"project": {"operator": "=", "values": [str(project_id)]}}])
+
+    while True:
+        resp = await client.get(
+            "/api/v3/memberships",
+            params={"offset": offset, "pageSize": page_size, "filters": filters},
+            tool="work_packages",
+        )
+        principals.extend(_collect_membership_principals(resp))
+        batch = embedded_elements(resp)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    return principals
+
+
+async def _resolve_principal_for_wp(
+    client: OpenProjectClient,
+    name_or_id: Any,
+    wp_payload: Dict[str, Any],
+) -> int:
+    # Fast path for numeric
+    if isinstance(name_or_id, str) and name_or_id.strip().isdigit():
+        return int(name_or_id.strip())
+    if isinstance(name_or_id, int):
+        return name_or_id
+
+    # Try available assignees
+    try:
+        avail = await _fetch_available_assignees_list(client, wp_payload)
+    except OpenProjectHTTPError as exc:
+        if exc.status_code not in (403, 404):
+            raise
+        avail = None
+
+    if avail:
+        try:
+            return _match_principal(name_or_id, avail)
+        except ValueError:
+            # Fall through to memberships or final error
+            pass
+
+    # Fallback to memberships if we have a project
+    project_href = get_link_href(wp_payload, "project")
+    project_id = parse_id_from_href(project_href) if project_href else None
+    if project_id is not None:
+        try:
+            principals = await _fetch_project_membership_principals(client, project_id)
+            if principals:
+                return _match_principal(name_or_id, principals)
+        except OpenProjectHTTPError as exc:
+            if exc.status_code not in (403, 404):
+                raise
+
+    # Final fallback: global resolver (may fail if permissions insufficient)
+    return await resolve_user(client, name_or_id)
+
+
 async def _resolve_project_id(client: OpenProjectClient, query: str) -> int:
     """
     Resolve a project by identifier or name (case-insensitive).
@@ -317,12 +465,9 @@ async def update_work_package(
         if data.assignee is None:
             links["assignee"] = {"href": None}
         else:
-            if isinstance(data.assignee, int):
-                assignee_id = data.assignee
-            elif isinstance(data.assignee, str) and data.assignee.strip().isdigit():
-                assignee_id = int(data.assignee.strip())
-            else:
-                assignee_id = await resolve_user(client, str(data.assignee))
+            assignee_id = await _resolve_principal_for_wp(
+                client, data.assignee, current
+            )
             links["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
 
     # Resolve responsible/accountable: only act if provided; None clears
@@ -330,14 +475,9 @@ async def update_work_package(
         if data.accountable is None:
             links["responsible"] = {"href": None}
         else:
-            if isinstance(data.accountable, int):
-                responsible_id = data.accountable
-            elif (
-                isinstance(data.accountable, str) and data.accountable.strip().isdigit()
-            ):
-                responsible_id = int(data.accountable.strip())
-            else:
-                responsible_id = await resolve_user(client, str(data.accountable))
+            responsible_id = await _resolve_principal_for_wp(
+                client, data.accountable, current
+            )
             links["responsible"] = {"href": f"/api/v3/users/{responsible_id}"}
 
     # Resolve type with project context when possible

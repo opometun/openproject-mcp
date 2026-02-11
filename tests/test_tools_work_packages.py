@@ -68,6 +68,25 @@ STATUSES = {
     },
 }
 
+AVAILABLE_ASSIGNEES = {
+    "_type": "Collection",
+    "total": 1,
+    "count": 1,
+    "pageSize": 1,
+    "offset": 1,
+    "_embedded": {
+        "elements": [
+            {
+                "id": 11,
+                "name": "Alice Smith",
+                "_links": {
+                    "self": {"href": "/api/v3/users/11", "title": "Alice Smith"}
+                },
+            }
+        ]
+    },
+}
+
 
 @pytest.fixture
 def client():
@@ -518,6 +537,38 @@ async def test_update_work_package_set_accountable_by_id(client):
 
     body = json.loads(patch_route.calls[0].request.content)
     assert body["_links"]["responsible"]["href"] == "/api/v3/users/11"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_assignee_by_name_uses_available_assignees(client):
+    wp_with_available = {
+        **WP_SINGLE,
+        "_links": {
+            **WP_SINGLE["_links"],
+            "availableAssignees": {
+                "href": "https://mock-op.com/api/v3/work_packages/42/available_assignees"
+            },
+        },
+    }
+
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=wp_with_available)
+    )
+    respx.get("https://mock-op.com/api/v3/work_packages/42/available_assignees").mock(
+        return_value=Response(200, json=AVAILABLE_ASSIGNEES)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(
+            client, WorkPackageUpdateInput(id=42, assignee="Alice Smith")
+        )
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["_links"]["assignee"]["href"] == "/api/v3/users/11"
 
 
 @pytest.mark.asyncio
