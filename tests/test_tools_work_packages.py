@@ -17,6 +17,7 @@ from openproject_mcp.tools.work_packages import (
     get_work_package,
     get_work_package_statuses,
     get_work_package_types,
+    list_work_package_versions,
     list_work_packages,
     search_content,
     update_status,
@@ -83,6 +84,20 @@ AVAILABLE_ASSIGNEES = {
                     "self": {"href": "/api/v3/users/11", "title": "Alice Smith"}
                 },
             }
+        ]
+    },
+}
+
+PROJECT_VERSIONS = {
+    "_type": "Collection",
+    "total": 2,
+    "count": 2,
+    "pageSize": 2,
+    "offset": 1,
+    "_embedded": {
+        "elements": [
+            {"id": 21, "name": "v1.0"},
+            {"id": 22, "name": "v2.0"},
         ]
     },
 }
@@ -549,6 +564,7 @@ async def test_update_work_package_assignee_by_name_uses_available_assignees(cli
             "availableAssignees": {
                 "href": "https://mock-op.com/api/v3/work_packages/42/available_assignees"
             },
+            "version": {"href": None},
         },
     }
 
@@ -569,6 +585,91 @@ async def test_update_work_package_assignee_by_name_uses_available_assignees(cli
 
     body = json.loads(patch_route.calls[0].request.content)
     assert body["_links"]["assignee"]["href"] == "/api/v3/users/11"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_set_version_by_name(client):
+    wp_with_version = {
+        **WP_SINGLE,
+        "_links": {**WP_SINGLE["_links"], "version": {"href": "/api/v3/versions/21"}},
+    }
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=wp_with_version)
+    )
+    respx.get("https://mock-op.com/api/v3/projects/5/versions").mock(
+        return_value=Response(200, json=PROJECT_VERSIONS)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(client, WorkPackageUpdateInput(id=42, version="v2.0"))
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["_links"]["version"]["href"] == "/api/v3/versions/22"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_clear_version(client):
+    wp_with_version = {
+        **WP_SINGLE,
+        "_links": {**WP_SINGLE["_links"], "version": {"href": "/api/v3/versions/21"}},
+    }
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=wp_with_version)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(client, WorkPackageUpdateInput(id=42, version=None))
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["_links"]["version"]["href"] is None
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_omit_version_not_included(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(
+            client, WorkPackageUpdateInput(id=42, subject="No version change")
+        )
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert "_links" not in body or "version" not in body.get("_links", {})
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_work_package_versions_happy_path(client):
+    wp_with_version_link = {
+        **WP_SINGLE,
+        "_links": {**WP_SINGLE["_links"], "version": {"href": "/api/v3/versions/21"}},
+    }
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=wp_with_version_link)
+    )
+    respx.get("https://mock-op.com/api/v3/projects/5/versions").mock(
+        return_value=Response(200, json=PROJECT_VERSIONS)
+    )
+
+    async with client:
+        result = await list_work_package_versions(client, 42)
+
+    assert result["items"][1]["name"] == "v2.0"
+    assert result["total"] == 2
 
 
 @pytest.mark.asyncio

@@ -148,6 +148,23 @@ def _match_principal(name_query: str, principals: List[Dict[str, Any]]) -> int:
     raise ValueError(f"User '{name_query}' not found; provide a numeric user id.")
 
 
+def _match_version(name_query: str, versions: List[Dict[str, Any]]) -> int:
+    q = _norm_text(name_query)
+    exact = [v for v in versions if _norm_text(v.get("name")) == q]
+    if len(exact) == 1 and exact[0].get("id") is not None:
+        return int(exact[0]["id"])
+
+    contains = [v for v in versions if q and q in _norm_text(v.get("name"))]
+    if len(contains) == 1 and contains[0].get("id") is not None:
+        return int(contains[0]["id"])
+
+    if len(exact) > 1 or len(contains) > 1:
+        raise ValueError(
+            f"Version name '{name_query}' is ambiguous; please provide a numeric version id."  # noqa: E501
+        )
+    raise ValueError(f"Version '{name_query}' not found; provide a numeric version id.")
+
+
 async def _fetch_available_assignees_list(
     client: OpenProjectClient, wp_payload: Dict[str, Any]
 ) -> Optional[List[Dict[str, Any]]]:
@@ -192,6 +209,65 @@ async def _fetch_project_membership_principals(
         offset += page_size
 
     return principals
+
+
+async def _fetch_project_versions(
+    client: OpenProjectClient, project_id: int
+) -> List[Dict[str, Any]]:
+    versions: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = MAX_PAGE_SIZE
+    while True:
+        resp = await client.get(
+            f"/api/v3/projects/{project_id}/versions",
+            params={"offset": offset, "pageSize": page_size},
+            tool="work_packages",
+        )
+        versions.extend(
+            [
+                {"id": v.get("id"), "name": v.get("name")}
+                for v in embedded_elements(resp)
+                if isinstance(v, dict)
+            ]
+        )
+        batch = embedded_elements(resp)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return versions
+
+
+async def _resolve_version_for_wp(
+    client: OpenProjectClient,
+    wp_payload: Dict[str, Any],
+    version_value: Any,
+) -> int:
+    # numeric fast path
+    if isinstance(version_value, int):
+        return version_value
+    if isinstance(version_value, str) and version_value.strip().isdigit():
+        return int(version_value.strip())
+
+    project_href = get_link_href(wp_payload, "project")
+    project_id = parse_id_from_href(project_href) if project_href else None
+    if project_id is None:
+        raise ValueError("Cannot resolve version: work package project is unknown.")
+
+    try:
+        versions = await _fetch_project_versions(client, project_id)
+    except OpenProjectHTTPError as exc:
+        if exc.status_code in (403, 404):
+            raise OpenProjectHTTPError(
+                status_code=exc.status_code,
+                method="GET",
+                url=f"{client.base_url}/api/v3/projects/{project_id}/versions",
+                message="Version list unavailable for this project; provide a numeric version id or check permissions.",  # noqa: E501
+                response_json=exc.response_json,
+                response_text=exc.response_text,
+            ) from exc
+        raise
+
+    return _match_version(str(version_value), versions)
 
 
 async def _resolve_principal_for_wp(
@@ -389,8 +465,8 @@ async def update_work_package(
     """
     Update multiple attributes of a work package in a single call.
     Supports subject, description (replace or append), status, priority, assignee,
-    responsible/accountable, start/due dates, percentage done, estimated time, type,
-    and project.
+    responsible/accountable, version, start/due dates, percentage done, estimated time,
+    type, and project.
     Only provided fields are changed; others are left untouched.
     """
     if data.description is not None and data.append_description is not None:
@@ -459,6 +535,19 @@ async def update_work_package(
     if data.priority is not None:
         priority_id = await resolve_priority_id(client, data.priority)
         links["priority"] = {"href": f"/api/v3/priorities/{priority_id}"}
+
+    # Version: only act if provided; None clears; name resolves within project
+    if "version" in data.model_fields_set:
+        if data.version is None:
+            links["version"] = {"href": None}
+        else:
+            # Check writable link presence
+            if "version" not in current.get("_links", {}):
+                raise ValueError(
+                    "Version is not writable for this work package; please check project/type settings."  # noqa: E501
+                )
+            version_id = await _resolve_version_for_wp(client, current, data.version)
+            links["version"] = {"href": f"/api/v3/versions/{version_id}"}
 
     # Resolve assignee: only act if the field was provided; None clears
     if "assignee" in data.model_fields_set:
@@ -665,3 +754,81 @@ async def get_work_package_types(client: OpenProjectClient) -> list[dict[str, An
     Expose raw types for manual exploration.
     """
     return await list_types(client)
+
+
+async def list_work_package_versions(
+    client: OpenProjectClient, wp_id: int
+) -> Dict[str, Any]:
+    """
+    List available Versions for the work package's project.
+    Raises a clear error if the field is not writable or versions are unavailable.
+    """
+    wp = await client.get(f"/api/v3/work_packages/{wp_id}", tool="work_packages")
+    project_href = get_link_href(wp, "project")
+    if not project_href:
+        raise OpenProjectHTTPError(
+            status_code=422,
+            method="GET",
+            url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
+            message="Cannot list versions: work package project is unknown.",
+        )
+
+    # If version link is missing, treat as not writable/hidden
+    if "version" not in wp.get("_links", {}):
+        raise OpenProjectHTTPError(
+            status_code=422,
+            method="GET",
+            url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
+            message="Version field is not available for this work package.",
+        )
+
+    project_id = parse_id_from_href(project_href)
+    if project_id is None:
+        raise OpenProjectHTTPError(
+            status_code=422,
+            method="GET",
+            url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
+            message="Cannot list versions: project id is missing.",
+        )
+
+    versions: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = MAX_PAGE_SIZE
+    while True:
+        try:
+            resp = await client.get(
+                f"/api/v3/projects/{project_id}/versions",
+                params={"offset": offset, "pageSize": page_size},
+                tool="work_packages",
+            )
+        except OpenProjectHTTPError as exc:
+            if exc.status_code in (403, 404):
+                raise OpenProjectHTTPError(
+                    status_code=exc.status_code,
+                    method="GET",
+                    url=f"{client.base_url}/api/v3/projects/{project_id}/versions",
+                    message="Unable to list versions for this project; check permissions or project versions configuration.",  # noqa: E501
+                    response_json=exc.response_json,
+                    response_text=exc.response_text,
+                ) from exc
+            raise
+
+        batch = embedded_elements(resp)
+        versions.extend(
+            [
+                {"id": v.get("id"), "name": v.get("name")}
+                for v in batch
+                if isinstance(v, dict)
+            ]
+        )
+
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    return {
+        "items": versions,
+        "total": len(versions),
+        "project_id": project_id,
+        "work_package_id": wp_id,
+    }

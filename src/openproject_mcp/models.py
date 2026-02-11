@@ -132,6 +132,7 @@ class WorkPackageUpdateInput(BaseModel):
     type: Optional[str] = None
     project: Optional[str] = None
     accountable: Optional[int | str | None] = None  # responsible link
+    version: Optional[int | str | None] = None
 
     model_config = ConfigDict(extra="forbid")
 
