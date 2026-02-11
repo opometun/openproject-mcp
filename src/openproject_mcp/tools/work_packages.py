@@ -120,6 +120,7 @@ async def _resolve_project_id(client: OpenProjectClient, query: str) -> int:
 
 
 async def get_work_package(client: OpenProjectClient, wp_id: int) -> Dict[str, Any]:
+    """Fetch a work package by ID and return a concise summary."""
     payload = await client.get(f"/api/v3/work_packages/{wp_id}", tool="work_packages")
     return _wp_to_summary(payload)
 
@@ -132,6 +133,7 @@ async def list_work_packages(
     project: Optional[str] = None,
     subject_contains: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """List work packages with optional project/subject filtering and pagination."""
     if offset < 0:
         raise ValueError("offset must be >= 0")
     page_size = _clamp_page_size(page_size)
@@ -176,6 +178,7 @@ async def list_work_packages(
 async def create_work_package(
     client: OpenProjectClient, data: WorkPackageCreateInput
 ) -> Dict[str, Any]:
+    """Create a work package with subject, description, type, project, priority, and status."""  # noqa: E501
     project_id = await _resolve_project_id(client, data.project)
     type_id = await resolve_type_id(client, data.type)
 
@@ -205,6 +208,7 @@ async def create_work_package(
 async def update_status(
     client: OpenProjectClient, data: WorkPackageUpdateStatusInput
 ) -> Dict[str, Any]:
+    """Update a work package's status by name, handling lockVersion for concurrency."""
     current = await client.get(f"/api/v3/work_packages/{data.id}", tool="work_packages")
     lock_version = current.get("lockVersion")
     if lock_version is None:

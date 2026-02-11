@@ -352,14 +352,17 @@ async def resolve_metadata_id(
 
 
 async def resolve_type_id(client: OpenProjectClient, type_name: str) -> int:
+    """Return the Type ID for a given type name (case-insensitive)."""
     return await resolve_metadata_id(client, "/api/v3/types", TypeRef, type_name)
 
 
 async def resolve_status_id(client: OpenProjectClient, status_name: str) -> int:
+    """Return the Status ID for a given status name (case-insensitive)."""
     return await resolve_metadata_id(client, "/api/v3/statuses", StatusRef, status_name)
 
 
 async def resolve_priority_id(client: OpenProjectClient, priority_name: str) -> int:
+    """Return the Priority ID for a given priority name (case-insensitive)."""
     return await resolve_metadata_id(
         client, "/api/v3/priorities", PriorityRef, priority_name
     )
