@@ -131,6 +131,7 @@ class WorkPackageUpdateInput(BaseModel):
     estimated_time: Optional[str] = None  # ISO 8601 preferred
     type: Optional[str] = None
     project: Optional[str] = None
+    accountable: Optional[int | str | None] = None  # responsible link
 
     model_config = ConfigDict(extra="forbid")
 

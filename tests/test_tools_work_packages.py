@@ -501,3 +501,58 @@ async def test_update_work_package_422_message(client):
             )
 
     assert "Status not allowed" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_set_accountable_by_id(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(client, WorkPackageUpdateInput(id=42, accountable=11))
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["_links"]["responsible"]["href"] == "/api/v3/users/11"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_clear_accountable(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(
+            client, WorkPackageUpdateInput(id=42, accountable=None)
+        )
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert body["_links"]["responsible"]["href"] is None
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_update_work_package_no_accountable_field_omitted(client):
+    respx.get("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+    patch_route = respx.patch("https://mock-op.com/api/v3/work_packages/42").mock(
+        return_value=Response(200, json=WP_SINGLE)
+    )
+
+    async with client:
+        await update_work_package(
+            client, WorkPackageUpdateInput(id=42, subject="Only subject")
+        )
+
+    body = json.loads(patch_route.calls[0].request.content)
+    assert "responsible" not in body.get("_links", {})

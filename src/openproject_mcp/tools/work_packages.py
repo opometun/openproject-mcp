@@ -241,7 +241,8 @@ async def update_work_package(
     """
     Update multiple attributes of a work package in a single call.
     Supports subject, description (replace or append), status, priority, assignee,
-    start/due dates, percentage done, estimated time, type, and project.
+    responsible/accountable, start/due dates, percentage done, estimated time, type,
+    and project.
     Only provided fields are changed; others are left untouched.
     """
     if data.description is not None and data.append_description is not None:
@@ -323,6 +324,21 @@ async def update_work_package(
             else:
                 assignee_id = await resolve_user(client, str(data.assignee))
             links["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
+
+    # Resolve responsible/accountable: only act if provided; None clears
+    if "accountable" in data.model_fields_set:
+        if data.accountable is None:
+            links["responsible"] = {"href": None}
+        else:
+            if isinstance(data.accountable, int):
+                responsible_id = data.accountable
+            elif (
+                isinstance(data.accountable, str) and data.accountable.strip().isdigit()
+            ):
+                responsible_id = int(data.accountable.strip())
+            else:
+                responsible_id = await resolve_user(client, str(data.accountable))
+            links["responsible"] = {"href": f"/api/v3/users/{responsible_id}"}
 
     # Resolve type with project context when possible
     if data.type is not None:
