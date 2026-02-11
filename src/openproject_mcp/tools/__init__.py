@@ -33,6 +33,7 @@ from .metadata import (
     resolve_user,
 )
 from .projects import list_projects
+from .queries import list_queries, run_query
 from .system import system_ping
 from .time_entries import get_my_logged_time, list_time_entries, log_time
 from .users import get_user_by_id
@@ -65,6 +66,8 @@ __all__ = [
     "resolve_project",
     "resolve_user",
     "list_projects",
+    "list_queries",
+    "run_query",
     "attach_file_to_wp",
     "list_attachments",
     "download_attachment",
