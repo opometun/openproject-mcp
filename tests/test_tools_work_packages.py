@@ -151,7 +151,7 @@ async def test_list_work_packages_pagination_and_filter(client):
         data = await list_work_packages(client, project="Demo", subject_contains="amp")
 
     assert data["items"][0]["id"] == 42
-    assert data["next_offset"] == 50  # total implies more pages
+    assert data["pages_scanned"] == 1
 
 
 @pytest.mark.asyncio
@@ -374,7 +374,7 @@ async def test_search_content_client_fallback(client):
     async with client:
         result = await search_content(client, "Sample")
 
-    assert result["scope"] == "client_filtered_first_page"
+    assert result["scope"] == "client_filtered_paginated"
     assert result["items"][0]["id"] == 42
 
 

@@ -360,46 +360,68 @@ async def list_work_packages(
     page_size: int = DEFAULT_PAGE_SIZE,
     project: Optional[str] = None,
     subject_contains: Optional[str] = None,
+    max_pages: int = 5,
 ) -> Dict[str, Any]:
     """List work packages with optional project/subject filtering and pagination."""
     if offset < 0:
         raise ValueError("offset must be >= 0")
     page_size = _clamp_page_size(page_size)
 
-    params = {"offset": offset, "pageSize": page_size}
-    payload = await client.get(
-        "/api/v3/work_packages", params=params, tool="work_packages"
-    )
-    elements = embedded_elements(payload)
-
-    summaries = [_wp_to_summary(e) for e in elements]
-
+    # Build server-side filters
+    filters = []
     if project:
         project_id = await _resolve_project_id(client, project)
-        summaries = [
-            s for s in summaries if s.get("project", {}).get("id") == project_id
-        ]
-
+        filters.append({"project": {"operator": "=", "values": [str(project_id)]}})
     if subject_contains:
-        needle = subject_contains.strip().casefold()
-        summaries = [s for s in summaries if needle in s.get("subject", "").casefold()]
+        filters.append({"text": {"operator": "~", "values": [subject_contains]}})
 
-    total: Optional[int] = (
-        payload.get("total") if isinstance(payload.get("total"), int) else None
-    )
-    if total is None:
-        total = len(summaries)
+    params = {"pageSize": page_size}
+    if filters:
+        params["filters"] = json.dumps(filters)
 
-    next_offset: Optional[int] = None
-    if isinstance(total, int) and (offset + page_size) < total:
-        next_offset = offset + page_size
+    items: List[Dict[str, Any]] = []
+    pages_scanned = 0
+    next_link: Optional[str] = None
+    current_offset = offset
+
+    while pages_scanned < max_pages:
+        if next_link:
+            payload = await client.get(next_link, tool="work_packages")
+        else:
+            payload = await client.get(
+                "/api/v3/work_packages",
+                params={**params, "offset": current_offset},
+                tool="work_packages",
+            )
+
+        elements = embedded_elements(payload)
+        items.extend([_wp_to_summary(e) for e in elements])
+        pages_scanned += 1
+
+        # HAL next link if present
+        next_link = get_link_href(payload, "nextByOffset")
+        total = payload.get("total") if isinstance(payload, dict) else None
+        page_size_payload = (
+            payload.get("pageSize") if isinstance(payload, dict) else None
+        )
+        if (
+            next_link is None
+            and isinstance(total, int)
+            and isinstance(page_size_payload, int)
+        ):
+            if (current_offset + page_size_payload) < total:
+                current_offset += page_size_payload
+                continue
+        if next_link is None:
+            break
 
     return {
-        "items": summaries,
+        "items": items,
         "offset": offset,
         "page_size": page_size,
-        "total": total,
-        "next_offset": next_offset,
+        "total": payload.get("total") if isinstance(payload, dict) else len(items),
+        "next_offset": current_offset + page_size if next_link else None,
+        "pages_scanned": pages_scanned,
     }
 
 
@@ -704,7 +726,7 @@ async def append_work_package_description(
 async def search_content(client: OpenProjectClient, query: str) -> Dict[str, Any]:
     """
     Search work packages by text. Tries server-side filter first; falls back to
-    client-side filtering of the first page if the server rejects the filter.
+    client-side filtering with pagination if the server rejects the filter.
     """
     params = {
         "pageSize": MAX_PAGE_SIZE,
@@ -719,22 +741,46 @@ async def search_content(client: OpenProjectClient, query: str) -> Dict[str, Any
         elements = embedded_elements(payload)
     except OpenProjectHTTPError as exc:
         if exc.status_code in (400, 415, 422):
-            # Fallback: first page, client-side filter
-            fallback = await client.get(
-                "/api/v3/work_packages",
-                params={"pageSize": MAX_PAGE_SIZE},
-                tool="work_packages",
-            )
-            elements = embedded_elements(fallback)
+            # Fallback: paginate and filter client-side on subject/description
+            scope = "client_filtered_paginated"
+            elements = []
+            offset = 0
+            page_size = MAX_PAGE_SIZE
+            pages_scanned = 0
             needle = query.strip().casefold()
+            while pages_scanned < 5:  # limit fallback scanning
+                fallback = await client.get(
+                    "/api/v3/work_packages",
+                    params={"pageSize": page_size, "offset": offset},
+                    tool="work_packages",
+                )
+                batch = embedded_elements(fallback)
 
-            def matches(item: Dict[str, Any]) -> bool:
-                subject = str(item.get("subject", "")).casefold()
-                desc = _description_raw_to_text(item.get("description")).casefold()
-                return needle in subject or needle in desc
+                def matches(item: Dict[str, Any], *, _needle: str = needle) -> bool:
+                    subject = str(item.get("subject", "")).casefold()
+                    desc = _description_raw_to_text(item.get("description")).casefold()
+                    return _needle in subject or _needle in desc
 
-            elements = [e for e in elements if matches(e)]
-            scope = "client_filtered_first_page"
+                elements.extend([e for e in batch if matches(e)])
+
+                total = fallback.get("total") if isinstance(fallback, dict) else None
+                page_size_payload = (
+                    fallback.get("pageSize") if isinstance(fallback, dict) else None
+                )
+                next_link = get_link_href(fallback, "nextByOffset")
+                pages_scanned += 1
+                if next_link:
+                    offset += (
+                        page_size_payload
+                        if isinstance(page_size_payload, int)
+                        else page_size
+                    )
+                    continue
+                if isinstance(total, int) and isinstance(page_size_payload, int):
+                    if (offset + page_size_payload) < total:
+                        offset += page_size_payload
+                        continue
+                break
         else:
             raise
 
