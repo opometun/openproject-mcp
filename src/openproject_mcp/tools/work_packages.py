@@ -24,7 +24,7 @@ from openproject_mcp.tools.metadata import (
 )
 from openproject_mcp.utils.time_parser import DurationParseError, parse_duration_string
 
-DEFAULT_PAGE_SIZE = 50
+DEFAULT_PAGE_SIZE = 150
 MAX_PAGE_SIZE = 200
 
 
