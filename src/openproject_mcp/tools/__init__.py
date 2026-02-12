@@ -32,11 +32,11 @@ from .metadata import (
     resolve_type_id,
     resolve_user,
 )
-from .projects import list_projects
+from .projects import get_project_summary, list_projects
 from .queries import list_queries, run_query
 from .system import system_ping
 from .time_entries import get_my_logged_time, list_time_entries, log_time
-from .users import get_user_by_id
+from .users import get_user_by_id, get_users
 from .work_packages import (
     add_comment,
     append_work_package_description,
@@ -68,6 +68,7 @@ __all__ = [
     "resolve_project",
     "resolve_user",
     "list_projects",
+    "get_project_summary",
     "list_queries",
     "run_query",
     "attach_file_to_wp",
@@ -91,4 +92,5 @@ __all__ = [
     "list_time_entries",
     "get_my_logged_time",
     "get_user_by_id",
+    "get_users",
 ]

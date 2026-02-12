@@ -2,7 +2,7 @@ import pytest
 import respx
 from httpx import Response
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools.users import get_user_by_id
+from openproject_mcp.tools.users import get_user_by_id, get_users
 
 
 @pytest.fixture
@@ -125,3 +125,127 @@ async def test_get_user_by_id_not_visible_404(client):
     err = excinfo.value
     assert err.status_code == 404
     assert "not found" in str(err).lower()
+
+
+# --- get_users tests ---
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_users_global_listing_with_email_filter(client):
+    respx.get("https://mock-op.com/api/v3/users").mock(
+        return_value=Response(
+            200,
+            json={
+                "total": 3,
+                "_embedded": {
+                    "elements": [
+                        {"id": 1, "name": "Alice", "mail": "alice@example.com"},
+                        {"id": 2, "name": "Bob", "mail": "bob@example.com"},
+                    ]
+                },
+            },
+        )
+    )
+
+    async with client:
+        data = await get_users(client, email_filter="bob")
+
+    assert data["items"] == [
+        {
+            "id": 2,
+            "name": "Bob",
+            "login": None,
+            "email": "bob@example.com",
+            "admin": None,
+            "status": None,
+        }
+    ]
+    assert data["warnings"] is None
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_users_falls_back_to_memberships(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [{"id": 5, "name": "Demo", "identifier": "demo"}]
+                }
+            },
+        )
+    )
+    # global forbidden
+    respx.get("https://mock-op.com/api/v3/users").mock(
+        return_value=Response(403, json={"message": "forbidden"})
+    )
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {
+                            "_links": {
+                                "principal": {"href": "/api/v3/users/9", "title": "Bob"}
+                            }
+                        }
+                    ]
+                },
+                "total": 1,
+            },
+        )
+    )
+
+    async with client:
+        data = await get_users(client, project="demo")
+
+    assert data["items"][0]["id"] == 9
+    assert data["items"][0]["name"] == "Bob"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_users_memberships_forbidden_and_global_forbidden(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [{"id": 5, "name": "Demo", "identifier": "demo"}]
+                }
+            },
+        )
+    )
+    respx.get("https://mock-op.com/api/v3/users").mock(
+        return_value=Response(403, json={"message": "forbidden"})
+    )
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(403, json={"message": "forbidden"})
+    )
+
+    async with client:
+        with pytest.raises(OpenProjectHTTPError):
+            await get_users(client, project="demo")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_users_email_filter_warning_when_hidden(client):
+    respx.get("https://mock-op.com/api/v3/users").mock(
+        return_value=Response(
+            200,
+            json={
+                "total": 1,
+                "_embedded": {"elements": [{"id": 1, "name": "Alice"}]},
+            },
+        )
+    )
+
+    async with client:
+        data = await get_users(client, email_filter="alice")
+
+    assert data["items"] == []
+    assert data["warnings"] is not None
