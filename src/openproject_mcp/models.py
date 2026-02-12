@@ -106,6 +106,13 @@ class WorkPackageCreateInput(BaseModel):
     description: Optional[str] = None
     priority: Optional[str] = None
     status: Optional[str] = None
+    assignee: Optional[int | str] = None
+    accountable: Optional[int | str] = None
+    start_date: Optional[date | str] = None
+    due_date: Optional[date | str] = None
+    percent_done: Optional[int] = None
+    estimated_time: Optional[str] = None  # ISO 8601 preferred
+    version: Optional[int | str] = None
 
     model_config = ConfigDict(extra="forbid")
 

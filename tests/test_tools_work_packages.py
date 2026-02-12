@@ -163,8 +163,14 @@ async def test_create_work_package_resolves_ids_and_posts(client):
     respx.get("https://mock-op.com/api/v3/types").mock(
         return_value=Response(200, json=TYPES)
     )
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES)
+    )
     respx.get("https://mock-op.com/api/v3/priorities").mock(
         return_value=Response(200, json=PRIORITIES)
+    )
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES)
     )
     respx.post("https://mock-op.com/api/v3/work_packages").mock(
         return_value=Response(201, json=WP_SINGLE)
@@ -184,6 +190,75 @@ async def test_create_work_package_resolves_ids_and_posts(client):
         )
 
     assert summary["id"] == 42
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_work_package_with_optional_fields(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(200, json=PROJECTS)
+    )
+    respx.get("https://mock-op.com/api/v3/projects/5/versions").mock(
+        return_value=Response(200, json=PROJECT_VERSIONS)
+    )
+    respx.get("https://mock-op.com/api/v3/types").mock(
+        return_value=Response(200, json=TYPES)
+    )
+    respx.get("https://mock-op.com/api/v3/statuses").mock(
+        return_value=Response(200, json=STATUSES)
+    )
+    respx.get("https://mock-op.com/api/v3/priorities").mock(
+        return_value=Response(200, json=PRIORITIES)
+    )
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {
+                            "_links": {
+                                "principal": {
+                                    "href": "/api/v3/users/9",
+                                    "title": "Bob",
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+        )
+    )
+    post_route = respx.post("https://mock-op.com/api/v3/work_packages").mock(
+        return_value=Response(201, json=WP_SINGLE)
+    )
+
+    async with client:
+        await create_work_package(
+            client,
+            data=WorkPackageCreateInput(
+                project="Demo",
+                type="Bug",
+                subject="Sample",
+                description="Hello",
+                priority="High",
+                status="In Progress",
+                assignee="Bob",
+                accountable=9,
+                start_date="2024-01-01",
+                due_date="2024-01-02",
+                percent_done=50,
+                estimated_time="2h",
+                version="v1.0",
+            ),
+        )
+
+    body = json.loads(post_route.calls[0].request.content)
+    assert body["subject"] == "Sample"
+    assert body["percentageDone"] == 50
+    assert body["_links"]["assignee"]["href"] == "/api/v3/users/9"
+    assert body["_links"]["responsible"]["href"] == "/api/v3/users/9"
+    assert body["_links"]["version"]["href"] == "/api/v3/versions/21"
 
 
 @pytest.mark.asyncio

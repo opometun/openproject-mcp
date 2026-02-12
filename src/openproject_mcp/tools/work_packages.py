@@ -211,6 +211,26 @@ async def _fetch_project_membership_principals(
     return principals
 
 
+async def _resolve_principal_for_project(
+    client: OpenProjectClient, project_id: int, name_or_id: Any
+) -> int:
+    if isinstance(name_or_id, int):
+        return name_or_id
+    if isinstance(name_or_id, str) and name_or_id.strip().isdigit():
+        return int(name_or_id.strip())
+
+    try:
+        principals = await _fetch_project_membership_principals(client, project_id)
+        if principals:
+            return _match_principal(str(name_or_id), principals)
+    except OpenProjectHTTPError as exc:
+        if exc.status_code not in (403, 404):
+            raise
+        # fall through to global resolver
+
+    return await resolve_user(client, str(name_or_id))
+
+
 async def _fetch_project_versions(
     client: OpenProjectClient, project_id: int
 ) -> List[Dict[str, Any]]:
@@ -428,9 +448,12 @@ async def list_work_packages(
 async def create_work_package(
     client: OpenProjectClient, data: WorkPackageCreateInput
 ) -> Dict[str, Any]:
-    """Create a work package with subject, description, type, project, priority, and status."""  # noqa: E501
+    """Create a work package with extended optional fields mirroring update."""
     project_id = await _resolve_project_id(client, data.project)
-    type_id = await resolve_type_id(client, data.type)
+    try:
+        type_id = await resolve_type_for_project(client, project_id, data.type)
+    except Exception:
+        type_id = await resolve_type_id(client, data.type)
 
     payload: Dict[str, Any] = {
         "subject": data.subject,
@@ -441,13 +464,62 @@ async def create_work_package(
         },
     }
 
-    if data.priority:
-        priority_id = await resolve_priority_id(client, data.priority)
-        payload["_links"]["priority"] = {"href": f"/api/v3/priorities/{priority_id}"}
+    links: Dict[str, Any] = payload["_links"]
 
-    if data.status:
+    if data.priority is not None:
+        priority_id = await resolve_priority_id(client, data.priority)
+        links["priority"] = {"href": f"/api/v3/priorities/{priority_id}"}
+
+    if data.status is not None:
         status_id = await resolve_status_id(client, data.status)
-        payload["_links"]["status"] = {"href": f"/api/v3/statuses/{status_id}"}
+        links["status"] = {"href": f"/api/v3/statuses/{status_id}"}
+
+    if data.assignee is not None:
+        assignee_id = await _resolve_principal_for_project(
+            client, project_id, data.assignee
+        )
+        links["assignee"] = {"href": f"/api/v3/users/{assignee_id}"}
+
+    if data.accountable is not None:
+        responsible_id = await _resolve_principal_for_project(
+            client, project_id, data.accountable
+        )
+        links["responsible"] = {"href": f"/api/v3/users/{responsible_id}"}
+
+    if data.version is not None:
+        version_id = await _resolve_version_for_wp(
+            client,
+            {"_links": {"project": {"href": f"/api/v3/projects/{project_id}"}}},
+            data.version,
+        )
+        links["version"] = {"href": f"/api/v3/versions/{version_id}"}
+
+    if data.start_date is not None:
+        payload["startDate"] = (
+            data.start_date.isoformat()
+            if hasattr(data.start_date, "isoformat")
+            else str(data.start_date)
+        )
+    if data.due_date is not None:
+        payload["dueDate"] = (
+            data.due_date.isoformat()
+            if hasattr(data.due_date, "isoformat")
+            else str(data.due_date)
+        )
+
+    if data.percent_done is not None:
+        if not (0 <= data.percent_done <= 100):
+            raise ValueError("percent_done must be between 0 and 100.")
+        payload["percentageDone"] = data.percent_done
+
+    if data.estimated_time is not None:
+        iso_duration = data.estimated_time
+        if not (isinstance(iso_duration, str) and iso_duration.startswith("PT")):
+            try:
+                iso_duration = parse_duration_string(str(data.estimated_time))
+            except DurationParseError as exc:
+                raise ValueError(str(exc)) from exc
+        payload["estimatedTime"] = iso_duration
 
     created = await client.post(
         "/api/v3/work_packages", json=payload, tool="work_packages"
