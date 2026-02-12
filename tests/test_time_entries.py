@@ -5,6 +5,7 @@ import pytest
 import respx
 from httpx import Response
 from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.tools.metadata import NotFoundResolutionError
 from openproject_mcp.tools.time_entries import (
     get_my_logged_time,
     list_time_entries,
@@ -188,6 +189,128 @@ async def test_list_time_entries_with_filters(client):
     assert {"workPackage": {"operator": "=", "values": ["9"]}} in filters
     assert {"spentOn": {"operator": ">=", "values": ["2024-01-01"]}} in filters
     assert {"spentOn": {"operator": "<=", "values": ["2024-01-31"]}} in filters
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_time_entries_user_by_name_via_memberships(client):
+    # project resolution
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {"id": 5, "name": "Demo", "identifier": "demo"},
+                    ]
+                }
+            },
+        )
+    )
+    # memberships for project
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {
+                            "_links": {
+                                "principal": {
+                                    "href": "/api/v3/users/9",
+                                    "title": "Bob",
+                                }
+                            }
+                        }
+                    ]
+                },
+                "total": 1,
+                "pageSize": 200,
+            },
+        )
+    )
+    route = respx.get("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(
+            200,
+            json={"total": 0, "_embedded": {"elements": []}},
+        )
+    )
+
+    async with client:
+        await list_time_entries(client, user="Bob", project="demo")
+
+    filters = json.loads(route.calls[0].request.url.params["filters"])
+    assert {"user": {"operator": "=", "values": ["9"]}} in filters
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_time_entries_user_by_name_memberships_forbidden(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [{"id": 5, "name": "Demo", "identifier": "demo"}]
+                }
+            },
+        )
+    )
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(403, json={"message": "forbidden"})
+    )
+    respx.get("https://mock-op.com/api/v3/users").mock(
+        return_value=Response(403, json={"message": "forbidden"})
+    )
+
+    async with client:
+        with pytest.raises(NotFoundResolutionError):
+            await list_time_entries(client, user="Bob", project="demo")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_list_time_entries_user_by_name_ambiguous_memberships(client):
+    respx.get("https://mock-op.com/api/v3/projects", params={"pageSize": "200"}).mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [{"id": 5, "name": "Demo", "identifier": "demo"}]
+                }
+            },
+        )
+    )
+    respx.get("https://mock-op.com/api/v3/memberships").mock(
+        return_value=Response(
+            200,
+            json={
+                "_embedded": {
+                    "elements": [
+                        {
+                            "_links": {
+                                "principal": {"href": "/api/v3/users/9", "title": "Bob"}
+                            }
+                        },
+                        {
+                            "_links": {
+                                "principal": {
+                                    "href": "/api/v3/users/10",
+                                    "title": "Bob",
+                                }
+                            }
+                        },
+                    ]
+                },
+                "total": 2,
+                "pageSize": 200,
+            },
+        )
+    )
+
+    async with client:
+        with pytest.raises(ValueError):
+            await list_time_entries(client, user="Bob", project="demo")
 
 
 @pytest.mark.asyncio

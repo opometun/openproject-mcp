@@ -5,7 +5,7 @@ import re
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from openproject_mcp.client import OpenProjectClient
+from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.hal import parse_id_from_href
 from openproject_mcp.tools._collections import embedded_elements
 from openproject_mcp.tools.metadata import (
@@ -77,12 +77,67 @@ def _parse_iso_duration_to_minutes(iso: str) -> Optional[int]:
     return hours * 60 + minutes + (1 if seconds and seconds > 0 else 0)
 
 
-async def _resolve_user_id(client: OpenProjectClient, user: Optional[Any]) -> int:
+def _norm_text(val: Optional[str]) -> str:
+    if not isinstance(val, str):
+        return ""
+    return " ".join(val.split()).strip().casefold()
+
+
+def _match_principal_by_name(name: str, principals: List[Dict[str, Any]]) -> int:
+    q = _norm_text(name)
+    exact = [p for p in principals if _norm_text(p.get("name")) == q]
+    if len(exact) == 1 and exact[0].get("id") is not None:
+        return int(exact[0]["id"])
+    partial = [p for p in principals if q and q in _norm_text(p.get("name"))]
+    if len(partial) == 1 and partial[0].get("id") is not None:
+        return int(partial[0]["id"])
+    if len(exact) > 1 or len(partial) > 1:
+        raise ValueError(
+            f"User name '{name}' is ambiguous; please provide a numeric user id."
+        )
+    raise ValueError(f"User '{name}' not found; provide a numeric user id.")
+
+
+async def _fetch_project_membership_principals(
+    client: OpenProjectClient, project_id: int
+) -> List[Dict[str, Any]]:
+    principals: List[Dict[str, Any]] = []
+    offset = 0
+    page_size = 200
+    filters = json.dumps([{"project": {"operator": "=", "values": [str(project_id)]}}])
+    while True:
+        resp = await client.get(
+            "/api/v3/memberships",
+            params={"offset": offset, "pageSize": page_size, "filters": filters},
+            tool="time_entries",
+        )
+        batch = embedded_elements(resp)
+        for el in batch:
+            if not isinstance(el, dict):
+                continue
+            link = (
+                el.get("_links", {}).get("principal", {})
+                if isinstance(el.get("_links", {}), dict)
+                else {}
+            )
+            href = link.get("href") if isinstance(link, dict) else None
+            title = link.get("title") if isinstance(link, dict) else None
+            principals.append({"id": parse_id_from_href(href), "name": title})
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return principals
+
+
+async def _resolve_user_id(
+    client: OpenProjectClient, user: Optional[Any], project_id: Optional[int]
+) -> int:
     """
-    Resolve user parameter to user id.
+    Resolve user parameter to user id with permission-resilient fallbacks.
     - None or "me" -> current user
     - int or numeric string -> treated as id
-    - otherwise -> resolve by name (with ambiguity handling)
+    - otherwise -> try project memberships (if project_id provided), then /users
+      If resolution is blocked by permissions, raise a clear guidance error.
     """
     if user is None or (isinstance(user, str) and user.strip().lower() == "me"):
         me = await client.get("/api/v3/users/me", tool="time_entries")
@@ -97,8 +152,41 @@ async def _resolve_user_id(client: OpenProjectClient, user: Optional[Any]) -> in
     if isinstance(user, str) and user.strip().isdigit():
         return int(user.strip())
 
-    # Name resolution via resolve_user (may raise ambiguity/not found)
-    return await resolve_user(client, str(user))
+    name = str(user)
+
+    # Project-scoped memberships first (if project provided)
+    if project_id is not None:
+        try:
+            principals = await _fetch_project_membership_principals(client, project_id)
+            if principals:
+                return _match_principal_by_name(name, principals)
+        except OpenProjectHTTPError as exc:
+            if exc.status_code not in (401, 403, 404):
+                raise
+            # fall through to global resolver / final error
+
+    # Global resolver as final attempt
+    try:
+        return await resolve_user(client, name)
+    except OpenProjectHTTPError as exc:
+        if exc.status_code in (401, 403, 404):
+            raise NotFoundResolutionError(
+                "Cannot resolve user by name; provide numeric user id or 'me' (user listing not permitted).",  # noqa: E501
+                query=name,
+                available=[],
+            ) from exc
+        raise
+    except Exception as exc:
+        # Catch ResolutionError or other resolver issues and surface a guidance error
+        raise NotFoundResolutionError(
+            "Cannot resolve user by name; provide numeric user id or 'me' (user listing not permitted).",  # noqa: E501
+            query=name,
+            available=[],
+        ) from exc
+    except NotFoundResolutionError:
+        raise
+    except ValueError:
+        raise
 
 
 async def _build_filters(
@@ -111,12 +199,13 @@ async def _build_filters(
 ) -> List[Dict[str, Any]]:
     filters: List[Dict[str, Any]] = []
 
-    user_id = await _resolve_user_id(client, user)
-    filters.append({"user": {"operator": "=", "values": [str(user_id)]}})
-
+    project_id: Optional[int] = None
     if project is not None:
         project_id = await resolve_project(client, project)
         filters.append({"project": {"operator": "=", "values": [str(project_id)]}})
+
+    user_id = await _resolve_user_id(client, user, project_id)
+    filters.append({"user": {"operator": "=", "values": [str(user_id)]}})
 
     if work_package is not None:
         filters.append(
