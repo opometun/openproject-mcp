@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import mimetypes
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Optional, Type, TypeVar
 
 import httpx
@@ -260,6 +262,76 @@ class OpenProjectClient:
         self, url: str, *, json: Dict[str, Any], tool: Optional[str] = None
     ) -> Dict[str, Any]:
         return await self.request("PATCH", url, json=json, tool=tool)
+
+    async def post_file(
+        self,
+        url: str,
+        *,
+        file_path: str,
+        field_name: str = "file",
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+        tool: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Upload a file using multipart/form-data.
+        - Streams from disk (does not load entire file into memory).
+        - Returns parsed JSON if present; {} on empty body.
+        - Retries are NOT applied to avoid duplicate uploads.
+        """
+        path = Path(file_path)
+        if not path.is_file():
+            raise OpenProjectClientError(f"File not found: {file_path}")
+
+        filename = filename or path.name
+        ctype = (
+            content_type
+            or mimetypes.guess_type(filename)[0]
+            or "application/octet-stream"
+        )
+
+        start = time.perf_counter()
+        try:
+            with path.open("rb") as fh:
+                # Temporarily drop default Content-Type so httpx can set multipart boundary.  # noqa: E501
+                old_ct = self.http.headers.pop("Content-Type", None)
+                try:
+                    headers = {"Accept": self.http.headers.get("Accept")}
+                    resp = await self.http.post(
+                        url,
+                        params=params,
+                        files={field_name: (filename, fh, ctype)},
+                        headers=headers,
+                    )
+                finally:
+                    if old_ct is not None:
+                        self.http.headers["Content-Type"] = old_ct
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as exc:
+            raise OpenProjectClientError(
+                f"Network/timeout error calling POST {url}: {exc}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise OpenProjectClientError(
+                f"HTTPX error calling POST {url}: {exc}"
+            ) from exc
+
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        self.log.debug(
+            "op.upload",
+            extra={
+                "tool": tool,
+                "method": "POST",
+                "url": str(resp.request.url),
+                "status": resp.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+
+        if resp.status_code < 200 or resp.status_code >= 300:
+            raise await self._to_http_error(resp, method="POST")
+
+        return self._safe_json(resp)
 
     async def request_model(
         self, model: Type[T], method: str, url: str, **kwargs: Any
