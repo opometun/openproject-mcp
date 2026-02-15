@@ -8,12 +8,10 @@ authors = [
     { name = "Your Name", email = "your.email@example.com" }
 ]
 dependencies = [
-    "mcp[cli]>=1.0.0",
+    "mcp[cli]>=1.11.0,!=1.12.0,!=1.12.1",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
-    "uvicorn>=0.20.0",  # For Stage 2 SSE support
-    "starlette>=0.30.0" # For Stage 2 SSE support
 ]
 
 [project.optional-dependencies]
@@ -23,7 +21,14 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.0.0",
     "pre-commit>=3.5.0",
-    "respx>=0.20.0" # For mocking HTTP requests in tests
+    "respx>=0.20.0", # For mocking HTTP requests in tests
+    "uvicorn>=0.20.0",
+    "starlette>=0.30.0",
+]
+
+http = [
+    "uvicorn>=0.20.0",
+    "starlette>=0.30.0",
 ]
 
 [build-system]
