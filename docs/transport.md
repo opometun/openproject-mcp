@@ -1,4 +1,4 @@
-# Transport: HTTP vs stdio (Stage 2.1)
+# Transport: HTTP vs stdio (Stage 2.9)
 
 ## Decision
 - **Chosen runner:** FastMCP native Streamable HTTP (Option A).
@@ -6,8 +6,9 @@
 - **SSE:** Not required; JSON response mode is the default. `GET /mcp` exists in FastMCP but returns `406 Not Acceptable` unless the client requests `text/event-stream`; with SSE disabled, clients should use POST only. FastMCP still expects `Accept` to include both `application/json` and `text/event-stream`; it will respond with JSON when `FASTMCP_JSON_RESPONSE=1`.
 - **Accept (compat mode):** The adapter normalizes Accept for JSON-first behavior. If Accept is missing, `*/*`, `application/*`, or includes `application/json` → JSON response. If Accept is **only** `text/event-stream` while SSE is disabled → 406 JSON error. `GET /mcp` returns 405 when SSE is disabled.
 - **Auth (HTTP):** `X-OpenProject-Key` required; base URL is deployment-static (no header override). Missing key → 401 JSON error; missing base URL (no env) → 500. `X-Request-Id` echoed.
-- **SSE gate:** `/mcp` remains JSON-only. `/mcp-sse` exists but returns 405 unless `MCP_ENABLE_SSE=1`; when enabled it serves SSE at `/mcp-sse` (POST/GET), optional keepalive `MCP_SSE_KEEPALIVE_S` (best-effort).
-- **Host/DNS rebinding:** For Stage 2.1 we explicitly disable DNS-rebinding protection in the transport settings to keep in-process tests simple. A dedicated security ticket (2.9) will re-enable this with an allowlist.
+- **CORS is not auth:** Origin/CORS checks only gate browser contexts. Authentication is always enforced via `X-OpenProject-Key` regardless of Origin.
+- **SSE gate:** `/mcp` remains JSON-only. `/mcp-sse` exists but returns 405 unless `MCP_ENABLE_SSE=1`; when enabled it serves SSE at `/mcp-sse` (POST/GET), optional keepalive `MCP_SSE_KEEPALIVE_S` (best-effort). Browser `EventSource` is **not supported** because it cannot send `X-OpenProject-Key`; use `fetch` streaming with headers or introduce an alternate auth token (future scope).
+- **Host/DNS rebinding:** DNS-rebinding protection is **enabled** with an allowlist derived from configured host + dev localhost toggle.
 
 ## How to run (HTTP)
 ```bash
@@ -57,7 +58,19 @@ curl -i -X POST http://127.0.0.1:8000/mcp \
 - path: `/mcp`
 - json_response: `true`
 - stateless_http: `true`
-- Env overrides: `FASTMCP_HOST`, `FASTMCP_PORT`, `FASTMCP_STREAMABLE_HTTP_PATH`, `FASTMCP_JSON_RESPONSE`, `FASTMCP_STATELESS_HTTP`
+- SSE: `MCP_ENABLE_SSE` (default false), `MCP_SSE_KEEPALIVE_S`
+- CORS / Origin (default deny):
+  - `MCP_ALLOWED_ORIGINS`: comma list, exact scheme+host+port match after normalization (IDNA, default ports applied). Empty => deny cross-origin.
+  - `MCP_DEV_ALLOW_LOCALHOST` (bool, default false): only valid when `MCP_ENV` in `{dev, local}` **and** `MCP_ALLOWED_ORIGINS` empty; auto-allows `http(s)://localhost|127.0.0.1` on any port. Otherwise startup fails.
+  - `MCP_ALLOW_CREDENTIALS` (default false): sets `Access-Control-Allow-Credentials`.
+  - `MCP_CORS_MAX_AGE` (seconds, default 0): optional preflight cache.
+  - Allowed request headers: `Content-Type, Accept, X-OpenProject-Key, X-Request-Id, X-OpenProject-BaseUrl`; exposed headers include `X-Request-Id`.
+- Security headers:
+  - Always: `X-Content-Type-Options=nosniff`, `X-Frame-Options=DENY`, `Referrer-Policy=no-referrer`, `Permissions-Policy=camera=(); microphone=(); geolocation=()`, `Cache-Control=no-store`.
+  - `MCP_CSP_ENABLED`: adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'`.
+  - `MCP_HSTS_ENABLED`: adds HSTS **only** when request is HTTPS or when proxy headers are trusted and indicate HTTPS.
+- Proxy trust for HTTPS/HSTS:
+  - `MCP_TRUST_PROXY_HEADERS` (default false) and `MCP_TRUSTED_PROXIES` (comma IP/CIDR, required when enabled). Uses `Forwarded` proto first, fallback `X-Forwarded-Proto`; only honored when client IP is trusted.
 
 ## Required versions / deps
 - `mcp[cli]` >= 1.11.0, explicitly excluding 1.12.0–1.12.1 due to reported Streamable HTTP regressions. Version guard is enforced in tests.

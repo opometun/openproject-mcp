@@ -13,6 +13,13 @@ from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
 from openproject_mcp.transports.http.config import HttpConfig
 from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
 from openproject_mcp.transports.http.middleware import ContextMiddleware
+from openproject_mcp.transports.http.origin_cors_middleware import (
+    OriginCorsMiddleware,
+    dev_localhost_allowlist,
+)
+from openproject_mcp.transports.http.security_headers_middleware import (
+    SecurityHeadersMiddleware,
+)
 
 log = logging.getLogger(__name__)
 
@@ -21,10 +28,35 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
     """Create and configure a FastMCP instance with registered tools."""
     cfg = cfg or HttpConfig.from_env()
 
-    # Disable DNS rebinding protection for now (Stage 2.1); will be
-    # revisited when we add explicit allowlist handling in ticket 2.9.
+    def _origin_to_str(spec):
+        default_port = 80 if spec.scheme == "http" else 443
+        if spec.port == default_port:
+            return f"{spec.scheme}://{spec.host}"
+        return f"{spec.scheme}://{spec.host}:{spec.port}"
+
+    allowed_origins: list[str] = [_origin_to_str(spec) for spec in cfg.allowed_origins]
+
+    # Dev localhost allowlist uses port=None (any); use wildcard for transport security
+    for spec in dev_localhost_allowlist(cfg):
+        if spec.port is None:
+            allowed_origins.append(f"{spec.scheme}://{spec.host}:*")
+        else:
+            allowed_origins.append(_origin_to_str(spec))
+
+    allowed_hosts = [cfg.host, "testserver"]
+    if cfg.dev_allow_localhost:
+        allowed_hosts.extend(["localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*"])
+    # Include hosts from allowlisted origins (with port if non-default)
+    for spec in cfg.allowed_origins:
+        host_port = f"{spec.host}:{spec.port}"
+        for h in (spec.host, host_port):
+            if h not in allowed_hosts:
+                allowed_hosts.append(h)
+
     transport_security = TransportSecuritySettings(
-        enable_dns_rebinding_protection=False
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
     )
 
     fastmcp = FastMCP(
@@ -54,10 +86,12 @@ def build_http_app(cfg: HttpConfig | None = None):
     """Return a Starlette app ready to serve Streamable HTTP requests."""
     fastmcp = build_fastmcp(cfg)
     app = fastmcp.streamable_http_app()
-    # Inject Accept middleware (JSON-first compat), message handling, then context middleware  # noqa: E501
-    app.add_middleware(AcceptMiddleware)
-    app.add_middleware(MessageHandlingMiddleware)
+    # Add in reverse of desired stacking so outermost ends up Security -> Origin -> Accept -> Message -> Context  # noqa: E501
     app.add_middleware(ContextMiddleware)
+    app.add_middleware(MessageHandlingMiddleware)
+    app.add_middleware(AcceptMiddleware)
+    app.add_middleware(OriginCorsMiddleware, cfg=cfg)
+    app.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
     # Mount SSE endpoint separately
     app.mount(
         "/mcp-sse",
@@ -84,6 +118,9 @@ def _build_sse_app(fastmcp: FastMCP, cfg: HttpConfig):
         return disabled_app
 
     sse_starlette = fastmcp.sse_app(mount_path="/mcp-sse")
+    # Order: Security outermost, then Origin
+    sse_starlette.add_middleware(OriginCorsMiddleware, cfg=cfg)
+    sse_starlette.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
     # keepalive best-effort; FastMCP may ignore if unsupported
     sse_starlette.state.sse_keepalive_s = cfg.sse_keepalive_s
     return sse_starlette
