@@ -14,7 +14,7 @@ from openproject_mcp.core.context import (
     apply_request_context,
     get_context,
     reset_context,
-    seed_from_headers,
+    seed_from_env,
 )
 
 
@@ -22,15 +22,33 @@ class ContextMiddleware(BaseHTTPMiddleware):
     """Starlette middleware to seed and reset ContextVars per request."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        ctx_candidate = seed_from_headers(request.headers)
+        # Seed from env defaults (no dotenv for HTTP)
+        try:
+            env_ctx = seed_from_env(use_dotenv=False)
+        except Exception:
+            env_ctx = None
+
+        api_key = request.headers.get("X-OpenProject-Key") or (
+            env_ctx.api_key if env_ctx else None
+        )
+        base_url = env_ctx.base_url if env_ctx else None
+        request_id = request.headers.get(REQUEST_ID_HEADER)
+        user_agent = request.headers.get("User-Agent")
+
+        tokens = []
+        ctx_request_id = request_id
+        if not ctx_request_id:
+            # ensure we have an ID even for early errors
+            ctx_request_id = request.headers.get(REQUEST_ID_HEADER) or ""
+
         tokens = []
         try:
             tokens = list(
                 apply_request_context(
-                    api_key=ctx_candidate.api_key,
-                    base_url=ctx_candidate.base_url,
-                    request_id=ctx_candidate.request_id,
-                    user_agent=ctx_candidate.user_agent,
+                    api_key=api_key or "",
+                    base_url=base_url or "",
+                    request_id=request_id,
+                    user_agent=user_agent,
                 )
             )
             context = get_context(require_api_key=True, require_base_url=True)
@@ -39,27 +57,39 @@ class ContextMiddleware(BaseHTTPMiddleware):
             return response
         except MissingApiKeyError as exc:
             return self._error_response(
-                status=401, code="missing_api_key", message=str(exc), ctx=ctx_candidate
+                status=401,
+                code="missing_api_key",
+                message=str(exc),
+                request_id=ctx_request_id
+                or request.headers.get(REQUEST_ID_HEADER)
+                or "",
             )
         except MissingBaseUrlError as exc:
             return self._error_response(
-                status=500, code="missing_base_url", message=str(exc), ctx=ctx_candidate
+                status=500,
+                code="missing_base_url",
+                message=str(exc),
+                request_id=ctx_request_id
+                or request.headers.get(REQUEST_ID_HEADER)
+                or "",
             )
         finally:
             reset_context(tokens)
 
     @staticmethod
-    def _error_response(*, status: int, code: str, message: str, ctx) -> Response:
+    def _error_response(
+        *, status: int, code: str, message: str, request_id: str
+    ) -> Response:
         body = {
             "error": code,
             "message": message,
-            "request_id": ctx.request_id,
+            "request_id": request_id,
         }
         response = Response(
             json.dumps(body),
             status_code=status,
             media_type="application/json",
-            headers={REQUEST_ID_HEADER: ctx.request_id},
+            headers={REQUEST_ID_HEADER: request_id},
         )
         return response
 
