@@ -5,6 +5,8 @@
 - **Fallback:** Switch to an ASGI wrapper (FastAPI/Starlette) only if FastMCP cannot provide: JSON responses, stateless mode, configurable `/mcp` path, pre-routing middleware hooks, or notification 202 handling. Currently no blockers in the allowed version range.
 - **SSE:** Not required; JSON response mode is the default. `GET /mcp` exists in FastMCP but returns `406 Not Acceptable` unless the client requests `text/event-stream`; with SSE disabled, clients should use POST only. FastMCP still expects `Accept` to include both `application/json` and `text/event-stream`; it will respond with JSON when `FASTMCP_JSON_RESPONSE=1`.
 - **Accept (compat mode):** The adapter normalizes Accept for JSON-first behavior. If Accept is missing, `*/*`, `application/*`, or includes `application/json` → JSON response. If Accept is **only** `text/event-stream` while SSE is disabled → 406 JSON error. `GET /mcp` returns 405 when SSE is disabled.
+- **Auth (HTTP):** `X-OpenProject-Key` required; base URL is deployment-static (no header override). Missing key → 401 JSON error; missing base URL (no env) → 500. `X-Request-Id` echoed.
+- **SSE gate:** `/mcp` remains JSON-only. `/mcp-sse` exists but returns 405 unless `MCP_ENABLE_SSE=1`; when enabled it serves SSE at `/mcp-sse` (POST/GET), optional keepalive `MCP_SSE_KEEPALIVE_S` (best-effort).
 - **Host/DNS rebinding:** For Stage 2.1 we explicitly disable DNS-rebinding protection in the transport settings to keep in-process tests simple. A dedicated security ticket (2.9) will re-enable this with an allowlist.
 
 ## How to run (HTTP)

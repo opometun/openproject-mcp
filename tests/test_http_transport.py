@@ -21,6 +21,26 @@ def _client(app, headers=None):
     )
 
 
+def _dummy_key_echo_tool(client):
+    async def key_echo():
+        return {
+            "base_url": client.base_url,
+            "api_key_len": len(client.http.auth.password),
+        }
+
+    return key_echo
+
+
+def _dummy_key_echo_tool(client):
+    async def key_echo():
+        return {
+            "base_url": client.base_url,
+            "api_key_len": len(client.http.auth.password),
+        }
+
+    return key_echo
+
+
 @pytest.mark.asyncio
 async def test_http_initialize_and_tools_list(monkeypatch):
     # Seed dummy env so client creation succeeds without real OpenProject calls
