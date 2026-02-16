@@ -6,9 +6,15 @@ from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from pydantic import BaseModel
 
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.models import PriorityRef, ProjectRef, StatusRef, TypeRef, UserRef
-from openproject_mcp.tools._collections import embedded_elements
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.models import (
+    PriorityRef,
+    ProjectRef,
+    StatusRef,
+    TypeRef,
+    UserRef,
+)
+from openproject_mcp.core.tools._collections import embedded_elements
 
 T = TypeVar("T", bound=BaseModel)
 

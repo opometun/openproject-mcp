@@ -1,8 +1,8 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools.memberships import get_project_memberships
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.tools.memberships import get_project_memberships
 
 
 @pytest.fixture

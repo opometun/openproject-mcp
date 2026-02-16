@@ -1,8 +1,8 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient
-from openproject_mcp.tools.system import system_ping
+from openproject_mcp.core.client import OpenProjectClient
+from openproject_mcp.core.tools.system import system_ping
 
 
 @pytest.fixture

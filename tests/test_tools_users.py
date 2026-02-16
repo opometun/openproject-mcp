@@ -1,8 +1,8 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools.users import get_user_by_id, get_users
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.tools.users import get_user_by_id, get_users
 
 
 @pytest.fixture

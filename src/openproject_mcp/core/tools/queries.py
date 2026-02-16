@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.hal import get_link_href, parse_id_from_href
-from openproject_mcp.tools._collections import embedded_elements
-from openproject_mcp.tools.work_packages import _clamp_page_size, _wp_to_summary
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.hal import get_link_href, parse_id_from_href
+from openproject_mcp.core.tools._collections import embedded_elements
+from openproject_mcp.core.tools.work_packages import _clamp_page_size, _wp_to_summary
 
 
 def _compute_next_offset(

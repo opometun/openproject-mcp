@@ -1,12 +1,12 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import (
+from openproject_mcp.core.client import (
     OpenProjectClient,
     OpenProjectClientError,
     OpenProjectHTTPError,
 )
-from openproject_mcp.tools.attachments import attach_file_to_wp, list_attachments
+from openproject_mcp.core.tools.attachments import attach_file_to_wp, list_attachments
 
 
 @pytest.fixture

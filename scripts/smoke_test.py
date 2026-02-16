@@ -6,11 +6,14 @@ import sys
 from datetime import datetime
 from typing import Optional
 
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.models import WorkPackageCreateInput, WorkPackageUpdateStatusInput
-from openproject_mcp.tools.metadata import list_statuses, list_types
-from openproject_mcp.tools.projects import list_projects
-from openproject_mcp.tools.work_packages import (
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.models import (
+    WorkPackageCreateInput,
+    WorkPackageUpdateStatusInput,
+)
+from openproject_mcp.core.tools.metadata import list_statuses, list_types
+from openproject_mcp.core.tools.projects import list_projects
+from openproject_mcp.core.tools.work_packages import (
     create_work_package,
     get_work_package,
     update_status,

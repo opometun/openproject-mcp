@@ -39,7 +39,7 @@ Tools exposed to the LLM must follow `snake_case` with a standard `verb_noun` st
     * `update_work_package_status` (Specific updates are preferred over generic `update_` to reduce schema complexity)
 
 ### Code Structure
-* **Module Naming:** `src/openproject_mcp/tools/{entity}.py` (e.g., `work_packages.py`).
+* **Module Naming:** `src/openproject_mcp/core/tools/{entity}.py` (e.g., `work_packages.py`).
 * **Class Naming:** Pydantic models use `PascalCase` (e.g., `WorkPackage`, `ProjectSummary`).
 
 ---
@@ -174,7 +174,7 @@ OpenProject instances may have custom fields (e.g., `customField16`).
 
 ## 11. Tool Discovery & Registration (MCP Server)
 
-* Tools live in `openproject_mcp.tools.*` modules.
+* Tools live in `openproject_mcp.core.tools.*` modules.
 * A function is registered as a tool only if:
   - async, name does not start with `_`
   - first parameter is `client`

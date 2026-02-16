@@ -1,36 +1,39 @@
-"""openproject_mcp package exports."""
+"""Top-level exports (compat) delegating to openproject_mcp.core."""
 
-from .client import (
+from openproject_mcp.core import (
     OpenProjectClient,
     OpenProjectClientError,
     OpenProjectHTTPError,
     OpenProjectModelValidationError,
     OpenProjectParseError,
     RetryConfig,
-)
-from .hal import (
+    create_client_from_env,
+    discover_tool_modules,
     get_embedded,
     get_link,
     get_link_href,
     get_link_title,
+    iter_tool_functions,
     parse_id_from_href,
+    register_discovered_tools,
     resolve_property,
 )
 
 __all__ = [
-    # Client
     "OpenProjectClient",
     "RetryConfig",
-    # Exceptions
     "OpenProjectClientError",
     "OpenProjectHTTPError",
     "OpenProjectParseError",
     "OpenProjectModelValidationError",
-    # HAL utilities
     "get_link",
     "get_link_href",
     "get_link_title",
     "get_embedded",
     "parse_id_from_href",
     "resolve_property",
+    "create_client_from_env",
+    "discover_tool_modules",
+    "iter_tool_functions",
+    "register_discovered_tools",
 ]

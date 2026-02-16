@@ -4,14 +4,17 @@ from datetime import date
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools.metadata import NotFoundResolutionError
-from openproject_mcp.tools.time_entries import (
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.tools.metadata import NotFoundResolutionError
+from openproject_mcp.core.tools.time_entries import (
     get_my_logged_time,
     list_time_entries,
     log_time,
 )
-from openproject_mcp.utils.time_parser import DurationParseError, parse_duration_string
+from openproject_mcp.core.utils.time_parser import (
+    DurationParseError,
+    parse_duration_string,
+)
 
 # --- Parser tests ---
 

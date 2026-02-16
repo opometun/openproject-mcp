@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from openproject_mcp.client import OpenProjectClient
-from openproject_mcp.models import ProjectRef
-from openproject_mcp.tools._collections import embedded_elements
-from openproject_mcp.tools.memberships import get_project_memberships
-from openproject_mcp.tools.metadata import _resolve_project_id_for_types
+from openproject_mcp.core.client import OpenProjectClient
+from openproject_mcp.core.models import ProjectRef
+from openproject_mcp.core.tools._collections import embedded_elements
+from openproject_mcp.core.tools.memberships import get_project_memberships
+from openproject_mcp.core.tools.metadata import _resolve_project_id_for_types
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200

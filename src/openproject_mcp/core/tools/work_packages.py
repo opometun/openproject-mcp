@@ -3,17 +3,17 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.hal import get_link_href, get_link_title, parse_id_from_href
-from openproject_mcp.models import (
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.hal import get_link_href, get_link_title, parse_id_from_href
+from openproject_mcp.core.models import (
     ProjectRef,
     WorkPackage,
     WorkPackageCreateInput,
     WorkPackageUpdateInput,
     WorkPackageUpdateStatusInput,
 )
-from openproject_mcp.tools._collections import embedded_elements
-from openproject_mcp.tools.metadata import (
+from openproject_mcp.core.tools._collections import embedded_elements
+from openproject_mcp.core.tools.metadata import (
     list_statuses,
     list_types,
     resolve_priority_id,
@@ -22,7 +22,10 @@ from openproject_mcp.tools.metadata import (
     resolve_type_id,
     resolve_user,
 )
-from openproject_mcp.utils.time_parser import DurationParseError, parse_duration_string
+from openproject_mcp.core.utils.time_parser import (
+    DurationParseError,
+    parse_duration_string,
+)
 
 DEFAULT_PAGE_SIZE = 150
 MAX_PAGE_SIZE = 200

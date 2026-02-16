@@ -1,16 +1,11 @@
 import json
 
-import openproject_mcp.tools.metadata as metadata
+import openproject_mcp.core.tools.metadata as metadata
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.models import (
-    WorkPackageCreateInput,
-    WorkPackageUpdateInput,
-    WorkPackageUpdateStatusInput,
-)
-from openproject_mcp.tools.work_packages import (
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.tools.work_packages import (
     add_comment,
     append_work_package_description,
     create_work_package,
@@ -22,6 +17,11 @@ from openproject_mcp.tools.work_packages import (
     search_content,
     update_status,
     update_work_package,
+)
+from openproject_mcp.models import (
+    WorkPackageCreateInput,
+    WorkPackageUpdateInput,
+    WorkPackageUpdateStatusInput,
 )
 
 WP_SINGLE = {
