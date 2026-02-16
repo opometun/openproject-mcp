@@ -92,7 +92,7 @@ async def test_http_notification_returns_202(monkeypatch):
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://testserver",
-            headers={"accept": "application/json, text/event-stream"},
+            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
         ) as client:
             notification_payload = {
                 "jsonrpc": "2.0",
@@ -102,11 +102,9 @@ async def test_http_notification_returns_202(monkeypatch):
             resp = await client.post(
                 cfg.path,
                 json=notification_payload,
-                headers={"X-OpenProject-Key": "dummy"},
             )
             assert resp.status_code == 202
-            # Should still be JSON content type even with empty body
-            assert resp.headers["content-type"].startswith("application/json")
+            assert resp.text == ""
 
 
 @pytest.mark.asyncio
@@ -161,3 +159,71 @@ async def test_http_accept_sse_only_returns_406(monkeypatch):
             assert resp.status_code == 406
             body = resp.json()
             assert body.get("error") == "not_acceptable"
+
+
+@pytest.mark.asyncio
+async def test_notification_only_returns_202(monkeypatch):
+    monkeypatch.setenv("OPENPROJECT_BASE_URL", "http://example.com")
+    monkeypatch.setenv("OPENPROJECT_API_KEY", "dummy")
+
+    cfg = HttpConfig(json_response=True, stateless_http=True)
+    app = build_http_app(cfg)
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        ) as client:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "notifications/tools/list_changed",
+                "params": {},
+            }
+            resp = await client.post(cfg.path, json=payload)
+            assert resp.status_code == 202
+            assert resp.text == ""
+
+
+@pytest.mark.asyncio
+async def test_malformed_json_returns_parse_error(monkeypatch):
+    monkeypatch.setenv("OPENPROJECT_BASE_URL", "http://example.com")
+    monkeypatch.setenv("OPENPROJECT_API_KEY", "dummy")
+
+    cfg = HttpConfig(json_response=True, stateless_http=True)
+    app = build_http_app(cfg)
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        ) as client:
+            resp = await client.post(cfg.path, content=b"{ not-json")
+            assert resp.status_code == 400
+            body = resp.json()
+            assert body["error"]["code"] == -32700
+
+
+@pytest.mark.asyncio
+async def test_invalid_request_returns_400(monkeypatch):
+    monkeypatch.setenv("OPENPROJECT_BASE_URL", "http://example.com")
+    monkeypatch.setenv("OPENPROJECT_API_KEY", "dummy")
+
+    cfg = HttpConfig(json_response=True, stateless_http=True)
+    app = build_http_app(cfg)
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        ) as client:
+            payload = {"jsonrpc": "2.0", "id": "1", "result": {}}
+            resp = await client.post(cfg.path, json=payload)
+            assert resp.status_code == 400
+            body = resp.json()
+            assert body["error"]["code"] == -32600
