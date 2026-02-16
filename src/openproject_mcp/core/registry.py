@@ -79,7 +79,9 @@ def iter_tool_functions(module: ModuleType) -> Iterable[Callable]:
 # --- Wrapping / registration ---------------------------------------------- #
 
 
-def _wrap_tool(func: Callable, client: OpenProjectClient) -> Callable:
+def _wrap_tool(
+    func: Callable, client_provider: Callable[[], OpenProjectClient]
+) -> Callable:
     """Return a wrapper that injects client and hides it from the signature."""
     original_sig = inspect.signature(func)
     type_hints = get_type_hints(func)
@@ -95,6 +97,7 @@ def _wrap_tool(func: Callable, client: OpenProjectClient) -> Callable:
     new_sig = inspect.Signature(parameters=new_params, return_annotation=return_ann)
 
     async def wrapped(*args, **kwargs):
+        client = client_provider()
         return await func(client, *args, **kwargs)
 
     wrapped.__name__ = func.__name__
@@ -105,9 +108,17 @@ def _wrap_tool(func: Callable, client: OpenProjectClient) -> Callable:
 
 
 def register_discovered_tools(
-    app, client: OpenProjectClient, modules: List[ModuleType] | None = None
+    app,
+    client_provider: Callable[[], OpenProjectClient] | OpenProjectClient,
+    modules: List[ModuleType] | None = None,
 ) -> None:
     """Register discovered tools on an app that exposes a .tool decorator."""
+    if isinstance(client_provider, OpenProjectClient):
+        _client = client_provider
+
+        def client_provider():
+            return _client
+
     if not hasattr(app, "tool"):
         raise TypeError("app must expose a 'tool' decorator")
 
@@ -120,7 +131,7 @@ def register_discovered_tools(
             if name in seen_names:
                 raise ValueError(f"Duplicate tool name detected: {name}")
 
-            wrapped = _wrap_tool(func, client)
+            wrapped = _wrap_tool(func, client_provider)
             app.tool(name=name)(wrapped)
             seen_names.add(name)
             log.info("Registered tool: %s (%s)", name, module.__name__)

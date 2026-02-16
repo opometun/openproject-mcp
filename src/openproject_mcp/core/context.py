@@ -7,6 +7,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional
 
+from .client import OpenProjectClient
 from .config import load_env_config
 
 # Context variables
@@ -85,6 +86,11 @@ def apply_request_context(
     return tokens
 
 
+def client_from_context() -> OpenProjectClient:
+    ctx = get_context(require_api_key=True, require_base_url=True)
+    return OpenProjectClient(base_url=ctx.base_url, api_key=ctx.api_key)
+
+
 def reset_context(tokens: Iterable[Token]) -> None:
     for token in tokens:
         token.var.reset(token)
@@ -121,6 +127,7 @@ __all__ = [
     "apply_request_context",
     "reset_context",
     "ensure_request_id",
+    "client_from_context",
     "API_KEY_HEADER",
     "REQUEST_ID_HEADER",
     "USER_AGENT_HEADER",

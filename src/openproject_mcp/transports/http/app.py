@@ -5,7 +5,7 @@ import logging
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from openproject_mcp.core.config import create_client_from_env
+from openproject_mcp.core.context import client_from_context
 from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.middleware import ContextMiddleware
 
@@ -34,8 +34,7 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
         transport_security=transport_security,
     )
 
-    client = create_client_from_env()
-    register_discovered_tools(fastmcp, client)
+    register_discovered_tools(fastmcp, client_from_context)
 
     log.info(
         "Built FastMCP (json_response=%s, stateless_http=%s, path=%s, host=%s, port=%s)",  # noqa: E501
