@@ -80,6 +80,12 @@ def _normalize_origin_list(origins: Iterable[str]) -> Tuple[OriginSpec, ...]:
     return tuple(normalized)
 
 
+# Error code strings used across middlewares/tests
+ERROR_PAYLOAD_TOO_LARGE = "payload_too_large"
+ERROR_TIMEOUT = "timeout"
+ERROR_PARSE_ERROR = "parse_error"
+
+
 @dataclass(frozen=True)
 class HttpConfig:
     """Minimal configuration for the HTTP transport runner."""
@@ -108,6 +114,10 @@ class HttpConfig:
         "X-Request-Id",
         "X-OpenProject-BaseUrl",
     )
+    max_body_bytes: int = 1_000_000
+    request_timeout_s: float = 30.0
+    timeout_status: int = 504
+    allow_disable_limits: bool = False
 
     @classmethod
     def from_env(cls) -> "HttpConfig":
@@ -143,6 +153,38 @@ class HttpConfig:
             ip_network(item, strict=False)
             trusted_proxies.append(item)
 
+        allow_disable_limits = _get_bool_env("MCP_ALLOW_DISABLE_LIMITS", False)
+
+        def _read_int_env(name: str, default: int) -> int:
+            raw = os.getenv(name)
+            if raw is None or raw.strip() == "":
+                return default
+            return int(raw.replace("_", ""))
+
+        max_body_bytes = _read_int_env("MCP_MAX_BODY_BYTES", 1_000_000)
+        request_timeout_s = float(os.getenv("MCP_REQUEST_TIMEOUT_S", "30") or 30)
+        timeout_status = int(os.getenv("MCP_TIMEOUT_STATUS", "504") or 504)
+
+        if timeout_status not in {408, 503, 504}:
+            raise ValueError("MCP_TIMEOUT_STATUS must be one of 408, 503, 504")
+
+        def _enforce_positive(name: str, value):
+            if value <= 0:
+                raise ValueError(f"{name} must be greater than zero")
+            return value
+
+        limits_disable_allowed = allow_disable_limits and env in {"dev", "local"}
+
+        if not limits_disable_allowed:
+            max_body_bytes = _enforce_positive("MCP_MAX_BODY_BYTES", max_body_bytes)
+            request_timeout_s = _enforce_positive(
+                "MCP_REQUEST_TIMEOUT_S", request_timeout_s
+            )
+        else:
+            # In dev/local with explicit opt-in, zero disables
+            if max_body_bytes < 0 or request_timeout_s < 0:
+                raise ValueError("Negative limits are not allowed")
+
         return cls(
             host=os.getenv("FASTMCP_HOST", cls.host),
             port=int(os.getenv("FASTMCP_PORT", cls.port)),
@@ -160,7 +202,19 @@ class HttpConfig:
             trust_proxy_headers=trust_proxy_headers,
             trusted_proxies=tuple(trusted_proxies),
             env=env,
+            max_body_bytes=max_body_bytes,
+            request_timeout_s=request_timeout_s,
+            timeout_status=timeout_status,
+            allow_disable_limits=allow_disable_limits,
         )
 
 
-__all__ = ["HttpConfig", "OriginSpec", "_normalize_origin", "_idna_lower"]
+__all__ = [
+    "HttpConfig",
+    "OriginSpec",
+    "_normalize_origin",
+    "_idna_lower",
+    "ERROR_PAYLOAD_TOO_LARGE",
+    "ERROR_TIMEOUT",
+    "ERROR_PARSE_ERROR",
+]
