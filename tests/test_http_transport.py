@@ -122,10 +122,7 @@ async def test_http_get_without_sse_returns_406(monkeypatch):
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://testserver",
-            headers={
-                "accept": "application/json",
-                "X-OpenProject-Key": "dummy",
-            },
+            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
         ) as client:
             resp = await client.get(cfg.path)
             assert resp.status_code in (
