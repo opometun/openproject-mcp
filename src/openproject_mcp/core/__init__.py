@@ -9,19 +9,17 @@ from .client import (
     RetryConfig,
 )
 from .config import create_client_from_env, load_env_config
-
-# from .errors import (
-#     OpenProjectClientError as _OpenProjectClientError,
-# )
-# from .errors import (
-#     OpenProjectHTTPError as _OpenProjectHTTPError,
-# )
-# from .errors import (
-#     OpenProjectModelValidationError as _OpenProjectModelValidationError,
-# )
-# from .errors import (
-#     OpenProjectParseError as _OpenProjectParseError,
-# )
+from .context import (
+    MissingApiKeyError,
+    MissingBaseUrlError,
+    RequestContext,
+    apply_request_context,
+    ensure_request_id,
+    get_context,
+    reset_context,
+    seed_from_env,
+    seed_from_headers,
+)
 from .hal import (
     get_embedded,
     get_link,
@@ -59,4 +57,14 @@ __all__ = [
     "discover_tool_modules",
     "iter_tool_functions",
     "register_discovered_tools",
+    # Context
+    "RequestContext",
+    "MissingApiKeyError",
+    "MissingBaseUrlError",
+    "seed_from_env",
+    "seed_from_headers",
+    "get_context",
+    "apply_request_context",
+    "reset_context",
+    "ensure_request_id",
 ]

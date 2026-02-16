@@ -7,9 +7,10 @@ from . import client as _client
 from .client import OpenProjectClient
 
 
-def load_env_config() -> Tuple[str, str]:
-    """Load OpenProject base URL and API key from environment (with .env support)."""
-    _client.load_dotenv()
+def load_env_config(*, use_dotenv: bool = True) -> Tuple[str, str]:
+    """Load OpenProject base URL and API key from environment (optional .env)."""
+    if use_dotenv:
+        _client.load_dotenv()
     base_url = os.getenv("OPENPROJECT_BASE_URL", "").strip()
     api_key = os.getenv("OPENPROJECT_API_KEY", "").strip()
     return base_url, api_key

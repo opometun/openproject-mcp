@@ -7,6 +7,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from openproject_mcp.core.config import create_client_from_env
 from openproject_mcp.core.registry import register_discovered_tools
+from openproject_mcp.transports.http.middleware import ContextMiddleware
 
 from .config import HttpConfig
 
@@ -50,7 +51,10 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
 def build_http_app(cfg: HttpConfig | None = None):
     """Return a Starlette app ready to serve Streamable HTTP requests."""
     fastmcp = build_fastmcp(cfg)
-    return fastmcp.streamable_http_app()
+    app = fastmcp.streamable_http_app()
+    # Inject context middleware for per-request ContextVar handling
+    app.add_middleware(ContextMiddleware)
+    return app
 
 
 __all__ = ["HttpConfig", "build_http_app", "build_fastmcp"]
