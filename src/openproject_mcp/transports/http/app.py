@@ -8,6 +8,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from openproject_mcp.core.context import client_from_context
 from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
+from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
 from openproject_mcp.transports.http.middleware import ContextMiddleware
 
 from .config import HttpConfig
@@ -52,8 +53,9 @@ def build_http_app(cfg: HttpConfig | None = None):
     """Return a Starlette app ready to serve Streamable HTTP requests."""
     fastmcp = build_fastmcp(cfg)
     app = fastmcp.streamable_http_app()
-    # Inject Accept middleware (JSON-first compat) then context middleware
+    # Inject Accept middleware (JSON-first compat), message handling, then context middleware  # noqa: E501
     app.add_middleware(AcceptMiddleware)
+    app.add_middleware(MessageHandlingMiddleware)
     app.add_middleware(ContextMiddleware)
     return app
 
