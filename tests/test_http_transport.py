@@ -47,7 +47,11 @@ async def test_http_initialize_and_tools_list(monkeypatch):
                     "clientInfo": {"name": "test-client", "version": "0.0.0"},
                 },
             }
-            resp = await client.post(cfg.path, json=init_payload)
+            resp = await client.post(
+                cfg.path,
+                json=init_payload,
+                headers={"X-OpenProject-Key": "dummy"},
+            )
             assert resp.status_code == 200
             assert resp.headers["content-type"].startswith("application/json")
             body = resp.json()
@@ -61,7 +65,11 @@ async def test_http_initialize_and_tools_list(monkeypatch):
                 "method": "tools/list",
                 "params": {"cursor": None},
             }
-            resp = await client.post(cfg.path, json=list_payload)
+            resp = await client.post(
+                cfg.path,
+                json=list_payload,
+                headers={"X-OpenProject-Key": "dummy"},
+            )
             assert resp.status_code == 200
             assert resp.headers["content-type"].startswith("application/json")
             body = resp.json()
@@ -91,7 +99,11 @@ async def test_http_notification_returns_202(monkeypatch):
                 "method": "notifications/tools/list_changed",
                 "params": {},
             }
-            resp = await client.post(cfg.path, json=notification_payload)
+            resp = await client.post(
+                cfg.path,
+                json=notification_payload,
+                headers={"X-OpenProject-Key": "dummy"},
+            )
             assert resp.status_code == 202
             # Should still be JSON content type even with empty body
             assert resp.headers["content-type"].startswith("application/json")
@@ -108,7 +120,12 @@ async def test_http_get_without_sse_returns_406(monkeypatch):
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(
-            transport=transport, base_url="http://testserver"
+            transport=transport,
+            base_url="http://testserver",
+            headers={
+                "accept": "application/json",
+                "X-OpenProject-Key": "dummy",
+            },
         ) as client:
             resp = await client.get(cfg.path)
             assert resp.status_code in (
