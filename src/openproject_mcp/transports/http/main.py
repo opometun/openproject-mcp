@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+
+from openproject_mcp.core.logging import setup_logging
 
 from .app import build_fastmcp
 from .config import HttpConfig
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    setup_logging()
     cfg = HttpConfig.from_env()
     fastmcp = build_fastmcp(cfg)
     await fastmcp.run_streamable_http_async()

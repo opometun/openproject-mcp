@@ -7,13 +7,13 @@ import mimetypes
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from openproject_mcp.client import (
+from openproject_mcp.core.client import (
     OpenProjectClient,
     OpenProjectClientError,
     OpenProjectHTTPError,
 )
-from openproject_mcp.hal import parse_id_from_href
-from openproject_mcp.tools._collections import embedded_elements
+from openproject_mcp.core.hal import parse_id_from_href
+from openproject_mcp.core.tools._collections import embedded_elements
 
 MAX_PAGE_SIZE = 200
 DEFAULT_PREVIEW_MAX_BYTES = 1024

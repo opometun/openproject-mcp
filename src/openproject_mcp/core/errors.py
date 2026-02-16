@@ -1,17 +1,11 @@
-"""Compatibility shim: re-export client from openproject_mcp.core.client."""
-
-from openproject_mcp.core.client import (
-    OpenProjectClient,
+from .client import (
     OpenProjectClientError,
     OpenProjectHTTPError,
     OpenProjectModelValidationError,
     OpenProjectParseError,
-    RetryConfig,
 )
 
 __all__ = [
-    "OpenProjectClient",
-    "RetryConfig",
     "OpenProjectClientError",
     "OpenProjectHTTPError",
     "OpenProjectParseError",

@@ -1,8 +1,8 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools.projects import get_project_summary, list_projects
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.tools.projects import get_project_summary, list_projects
 
 PROJECTS_PAYLOAD = {
     "_type": "Collection",

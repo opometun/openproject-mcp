@@ -18,3 +18,8 @@ Optional env overrides:
 - `SMOKE_TEST_CLEANUP=1` — attempt a simple cleanup step (default leaves the created WP).
 
 The script prints human-readable steps and exits non-zero on failure.
+
+## Package layout (Stage 2.2)
+- Core, transport-agnostic code lives in `openproject_mcp/core/`.
+- Transports live in `openproject_mcp/transports/{stdio,http}/`.
+- Compatibility shims keep `openproject_mcp.client`, `hal`, `models`, and `server_registry` working; prefer the new `openproject_mcp.core.*` imports. Shims are slated for removal in a future release.

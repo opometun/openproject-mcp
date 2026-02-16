@@ -5,8 +5,8 @@ import logging
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from openproject_mcp.server import create_client_from_env
-from openproject_mcp.server_registry import register_discovered_tools
+from openproject_mcp.core.config import create_client_from_env
+from openproject_mcp.core.registry import register_discovered_tools
 
 from .config import HttpConfig
 

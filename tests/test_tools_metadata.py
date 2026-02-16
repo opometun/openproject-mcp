@@ -1,9 +1,9 @@
 import pytest
 import respx
 from httpx import Response
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.tools import metadata
-from openproject_mcp.tools.metadata import (
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.tools import metadata
+from openproject_mcp.core.tools.metadata import (
     AmbiguousResolutionError,
     NotFoundResolutionError,
     list_priorities,

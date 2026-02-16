@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from openproject_mcp.client import OpenProjectClient, OpenProjectHTTPError
-from openproject_mcp.hal import parse_id_from_href
-from openproject_mcp.tools._collections import embedded_elements
-from openproject_mcp.tools.metadata import _norm, _resolve_project_id_for_types
+from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
+from openproject_mcp.core.hal import parse_id_from_href
+from openproject_mcp.core.tools._collections import embedded_elements
+from openproject_mcp.core.tools.metadata import _norm, _resolve_project_id_for_types
 
 MAX_PAGE_SIZE = 200
 

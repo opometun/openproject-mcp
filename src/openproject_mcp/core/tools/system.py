@@ -1,6 +1,6 @@
 import time
 
-from openproject_mcp.client import OpenProjectClient
+from openproject_mcp.core.client import OpenProjectClient
 
 
 async def system_ping(client: OpenProjectClient) -> dict:
