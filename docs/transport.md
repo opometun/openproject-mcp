@@ -1,4 +1,4 @@
-# Transport: HTTP vs stdio (Stage 2.9)
+# Transport: HTTP vs stdio (Stage 2.10)
 
 ## Decision
 - **Chosen runner:** FastMCP native Streamable HTTP (Option A).
@@ -8,6 +8,7 @@
 - **Auth (HTTP):** `X-OpenProject-Key` required; base URL is deployment-static (no header override). Missing key → 401 JSON error; missing base URL (no env) → 500. `X-Request-Id` echoed.
 - **CORS is not auth:** Origin/CORS checks only gate browser contexts. Authentication is always enforced via `X-OpenProject-Key` regardless of Origin.
 - **SSE gate:** `/mcp` remains JSON-only. `/mcp-sse` exists but returns 405 unless `MCP_ENABLE_SSE=1`; when enabled it serves SSE at `/mcp-sse` (POST/GET), optional keepalive `MCP_SSE_KEEPALIVE_S` (best-effort). Browser `EventSource` is **not supported** because it cannot send `X-OpenProject-Key`; use `fetch` streaming with headers or introduce an alternate auth token (future scope).
+- **Limits:** POST `/mcp` enforces max body bytes and an overall handler timeout (body read + handler). Limits are tunable via env (see below). Timeout returns JSON error with configurable status (default 504). Body over limit returns 413. Invalid JSON returns 400. SSE endpoints are **not** subject to these limits.
 - **Host/DNS rebinding:** DNS-rebinding protection is **enabled** with an allowlist derived from configured host + dev localhost toggle.
 
 ## How to run (HTTP)
@@ -65,6 +66,11 @@ curl -i -X POST http://127.0.0.1:8000/mcp \
   - `MCP_ALLOW_CREDENTIALS` (default false): sets `Access-Control-Allow-Credentials`.
   - `MCP_CORS_MAX_AGE` (seconds, default 0): optional preflight cache.
   - Allowed request headers: `Content-Type, Accept, X-OpenProject-Key, X-Request-Id, X-OpenProject-BaseUrl`; exposed headers include `X-Request-Id`.
+- Request limits (default on):
+  - `MCP_MAX_BODY_BYTES` (default 1_000_000). Must be >0 unless `MCP_ALLOW_DISABLE_LIMITS=1` and `MCP_ENV` in `dev|local` (then 0 disables).
+  - `MCP_REQUEST_TIMEOUT_S` (default 30). Same disable rules as above; applies to POST `/mcp` body read + handler.
+  - `MCP_TIMEOUT_STATUS` (default 504; allowed 408/503/504) controls the HTTP status for timeouts.
+  - `MCP_ALLOW_DISABLE_LIMITS` (default false) gates allowing 0 values in dev/local only.
 - Security headers:
   - Always: `X-Content-Type-Options=nosniff`, `X-Frame-Options=DENY`, `Referrer-Policy=no-referrer`, `Permissions-Policy=camera=(); microphone=(); geolocation=()`, `Cache-Control=no-store`.
   - `MCP_CSP_ENABLED`: adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'`.
@@ -76,8 +82,9 @@ curl -i -X POST http://127.0.0.1:8000/mcp \
 - `mcp[cli]` >= 1.11.0, explicitly excluding 1.12.0–1.12.1 due to reported Streamable HTTP regressions. Version guard is enforced in tests.
 - HTTP extras: install with `pip install .[http]` (uvicorn, starlette). Core/stdio remains dependency-light.
 
-## Test coverage (added in Stage 2.1)
+## Test coverage (expanded in Stage 2.10)
 - In-process ASGI tests: initialize (200 JSON), tools/list (200 JSON with tools present), notification-only (202, JSON headers), JSON-only assertion (no `text/event-stream`), and GET without SSE Accept returns 405/406.
+- Limits: content-length over limit → 413 JSON; chunked over limit → 413 with CORS; at-limit succeeds; timeout returns configured status with security/CORS headers; disable guard enforced; SSE unaffected by timeout.
 
 ## Notes for later stages
 - Auth, rate limiting, request-id, CORS/security headers, health/readiness, and SSE (if ever required) will be added via middleware/hooks in later tickets.

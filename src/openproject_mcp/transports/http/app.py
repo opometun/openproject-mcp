@@ -11,6 +11,7 @@ from openproject_mcp.core.context import client_from_context
 from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
 from openproject_mcp.transports.http.config import HttpConfig
+from openproject_mcp.transports.http.max_body_middleware import MaxBodyMiddleware
 from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
 from openproject_mcp.transports.http.middleware import ContextMiddleware
 from openproject_mcp.transports.http.origin_cors_middleware import (
@@ -20,6 +21,7 @@ from openproject_mcp.transports.http.origin_cors_middleware import (
 from openproject_mcp.transports.http.security_headers_middleware import (
     SecurityHeadersMiddleware,
 )
+from openproject_mcp.transports.http.timeout_middleware import TimeoutMiddleware
 
 log = logging.getLogger(__name__)
 
@@ -84,12 +86,16 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
 
 def build_http_app(cfg: HttpConfig | None = None):
     """Return a Starlette app ready to serve Streamable HTTP requests."""
+    cfg = cfg or HttpConfig.from_env()
     fastmcp = build_fastmcp(cfg)
     app = fastmcp.streamable_http_app()
-    # Add in reverse of desired stacking so outermost ends up Security -> Origin -> Accept -> Message -> Context  # noqa: E501
-    app.add_middleware(ContextMiddleware)
+    # Add from innermost to outermost (Starlette inserts at front), desired exec:
+    # Security -> Origin -> Timeout -> Accept -> MaxBody -> Context -> Message -> app
     app.add_middleware(MessageHandlingMiddleware)
+    app.add_middleware(ContextMiddleware)
+    app.add_middleware(MaxBodyMiddleware, cfg=cfg)
     app.add_middleware(AcceptMiddleware)
+    app.add_middleware(TimeoutMiddleware, cfg=cfg)
     app.add_middleware(OriginCorsMiddleware, cfg=cfg)
     app.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
     # Mount SSE endpoint separately
@@ -118,7 +124,7 @@ def _build_sse_app(fastmcp: FastMCP, cfg: HttpConfig):
         return disabled_app
 
     sse_starlette = fastmcp.sse_app(mount_path="/mcp-sse")
-    # Order: Security outermost, then Origin
+    # Order: Security outermost, then Origin (no timeout/max-body on SSE)
     sse_starlette.add_middleware(OriginCorsMiddleware, cfg=cfg)
     sse_starlette.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
     # keepalive best-effort; FastMCP may ignore if unsupported
