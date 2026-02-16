@@ -125,7 +125,39 @@ async def test_http_get_without_sse_returns_406(monkeypatch):
             headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
         ) as client:
             resp = await client.get(cfg.path)
-            assert resp.status_code in (
-                405,
-                406,
-            )  # streamable_http currently returns 406 without Accept: text/event-stream
+            assert resp.status_code == 405
+            body = resp.json()
+            assert body.get("error") == "method_not_allowed"
+
+
+@pytest.mark.asyncio
+async def test_http_accept_sse_only_returns_406(monkeypatch):
+    monkeypatch.setenv("OPENPROJECT_BASE_URL", "http://example.com")
+    monkeypatch.setenv("OPENPROJECT_API_KEY", "dummy")
+
+    cfg = HttpConfig(json_response=True, stateless_http=True)
+    app = build_http_app(cfg)
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            headers={"accept": "text/event-stream", "X-OpenProject-Key": "dummy"},
+        ) as client:
+            resp = await client.post(
+                cfg.path,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "1",
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {},
+                        "clientInfo": {"name": "t", "version": "0"},
+                    },
+                },
+            )
+            assert resp.status_code == 406
+            body = resp.json()
+            assert body.get("error") == "not_acceptable"
