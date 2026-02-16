@@ -26,6 +26,8 @@ class HttpConfig:
     path: str = "/mcp"
     json_response: bool = True
     stateless_http: bool = True
+    enable_sse: bool = False
+    sse_keepalive_s: int = 15
 
     @classmethod
     def from_env(cls) -> "HttpConfig":
@@ -35,4 +37,6 @@ class HttpConfig:
             path=os.getenv("FASTMCP_STREAMABLE_HTTP_PATH", cls.path),
             json_response=_get_bool_env("FASTMCP_JSON_RESPONSE", cls.json_response),
             stateless_http=_get_bool_env("FASTMCP_STATELESS_HTTP", cls.stateless_http),
+            enable_sse=_get_bool_env("MCP_ENABLE_SSE", cls.enable_sse),
+            sse_keepalive_s=int(os.getenv("MCP_SSE_KEEPALIVE_S", cls.sse_keepalive_s)),
         )

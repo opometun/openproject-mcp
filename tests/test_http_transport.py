@@ -14,6 +14,13 @@ def test_mcp_version_guard():
     assert version not in MCP_EXCLUDED
 
 
+def _client(app, headers=None):
+    transport = httpx.ASGITransport(app=app)
+    return httpx.AsyncClient(
+        transport=transport, base_url="http://testserver", headers=headers or {}
+    )
+
+
 @pytest.mark.asyncio
 async def test_http_initialize_and_tools_list(monkeypatch):
     # Seed dummy env so client creation succeeds without real OpenProject calls
@@ -30,11 +37,12 @@ async def test_http_initialize_and_tools_list(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "application/json, text/event-stream"},
+        async with _client(
+            app,
+            {
+                "accept": "application/json, text/event-stream",
+                "X-OpenProject-Key": "dummy",
+            },
         ) as client:
             # Initialize
             init_payload = {
@@ -50,7 +58,6 @@ async def test_http_initialize_and_tools_list(monkeypatch):
             resp = await client.post(
                 cfg.path,
                 json=init_payload,
-                headers={"X-OpenProject-Key": "dummy"},
             )
             assert resp.status_code == 200
             assert resp.headers["content-type"].startswith("application/json")
@@ -88,11 +95,8 @@ async def test_http_notification_returns_202(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        async with _client(
+            app, {"accept": "application/json", "X-OpenProject-Key": "dummy"}
         ) as client:
             notification_payload = {
                 "jsonrpc": "2.0",
@@ -116,11 +120,8 @@ async def test_http_get_without_sse_returns_406(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        async with _client(
+            app, {"accept": "application/json", "X-OpenProject-Key": "dummy"}
         ) as client:
             resp = await client.get(cfg.path)
             assert resp.status_code == 405
@@ -137,11 +138,8 @@ async def test_http_accept_sse_only_returns_406(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "text/event-stream", "X-OpenProject-Key": "dummy"},
+        async with _client(
+            app, {"accept": "text/event-stream", "X-OpenProject-Key": "dummy"}
         ) as client:
             resp = await client.post(
                 cfg.path,
@@ -170,11 +168,8 @@ async def test_notification_only_returns_202(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        async with _client(
+            app, {"accept": "application/json", "X-OpenProject-Key": "dummy"}
         ) as client:
             payload = {
                 "jsonrpc": "2.0",
@@ -195,11 +190,8 @@ async def test_malformed_json_returns_parse_error(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        async with _client(
+            app, {"accept": "application/json", "X-OpenProject-Key": "dummy"}
         ) as client:
             resp = await client.post(cfg.path, content=b"{ not-json")
             assert resp.status_code == 400
@@ -216,11 +208,8 @@ async def test_invalid_request_returns_400(monkeypatch):
     app = build_http_app(cfg)
 
     async with app.router.lifespan_context(app):
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"accept": "application/json", "X-OpenProject-Key": "dummy"},
+        async with _client(
+            app, {"accept": "application/json", "X-OpenProject-Key": "dummy"}
         ) as client:
             payload = {"jsonrpc": "2.0", "id": "1", "result": {}}
             resp = await client.post(cfg.path, json=payload)
