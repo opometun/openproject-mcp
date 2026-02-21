@@ -18,6 +18,10 @@ from openproject_mcp.transports.http.origin_cors_middleware import (
     OriginCorsMiddleware,
     dev_localhost_allowlist,
 )
+from openproject_mcp.transports.http.rate_limit import (
+    RateLimitMiddleware,
+    SSEHandshakeRateLimitMiddleware,
+)
 from openproject_mcp.transports.http.security_headers_middleware import (
     SecurityHeadersMiddleware,
 )
@@ -90,10 +94,11 @@ def build_http_app(cfg: HttpConfig | None = None):
     fastmcp = build_fastmcp(cfg)
     app = fastmcp.streamable_http_app()
     # Add from innermost to outermost (Starlette inserts at front), desired exec:
-    # Security -> Origin -> Timeout -> Accept -> MaxBody -> Context -> Message -> app
+    # Security -> Origin -> Timeout -> Accept -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
     app.add_middleware(MessageHandlingMiddleware)
-    app.add_middleware(ContextMiddleware)
     app.add_middleware(MaxBodyMiddleware, cfg=cfg)
+    app.add_middleware(RateLimitMiddleware, cfg=cfg)
+    app.add_middleware(ContextMiddleware)
     app.add_middleware(AcceptMiddleware)
     app.add_middleware(TimeoutMiddleware, cfg=cfg)
     app.add_middleware(OriginCorsMiddleware, cfg=cfg)
@@ -124,7 +129,8 @@ def _build_sse_app(fastmcp: FastMCP, cfg: HttpConfig):
         return disabled_app
 
     sse_starlette = fastmcp.sse_app(mount_path="/mcp-sse")
-    # Order: Security outermost, then Origin (no timeout/max-body on SSE)
+    # Order: Security outermost, then Origin, then optional SSE handshake limiter (no timeout/max-body on SSE)  # noqa: E501
+    sse_starlette.add_middleware(SSEHandshakeRateLimitMiddleware, cfg=cfg)
     sse_starlette.add_middleware(OriginCorsMiddleware, cfg=cfg)
     sse_starlette.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
     # keepalive best-effort; FastMCP may ignore if unsupported

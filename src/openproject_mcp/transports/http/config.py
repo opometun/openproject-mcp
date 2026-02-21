@@ -118,6 +118,13 @@ class HttpConfig:
     request_timeout_s: float = 30.0
     timeout_status: int = 504
     allow_disable_limits: bool = False
+    rate_limit_rpm: int = 60
+    rate_limit_window_s: int = 60
+    rate_limit_allow_disable: bool = False
+    rate_limit_max_keys: int = 10_000
+    rate_limit_ttl_windows: int = 3
+    rate_limit_sse_rpm: int = 10
+    rate_limit_hash_secret: str | None = None
 
     @classmethod
     def from_env(cls) -> "HttpConfig":
@@ -185,6 +192,26 @@ class HttpConfig:
             if max_body_bytes < 0 or request_timeout_s < 0:
                 raise ValueError("Negative limits are not allowed")
 
+        # Rate limiting config
+        rate_limit_allow_disable = _get_bool_env("MCP_RATE_LIMIT_ALLOW_DISABLE", False)
+        rate_limit_rpm = _read_int_env("MCP_RATE_LIMIT_RPM", 60)
+        rate_limit_window_s = _read_int_env("MCP_RATE_LIMIT_WINDOW_S", 60)
+        rate_limit_max_keys = _read_int_env("MCP_RATE_LIMIT_MAX_KEYS", 10_000)
+        rate_limit_ttl_windows = _read_int_env("MCP_RATE_LIMIT_TTL_WINDOWS", 3)
+        rate_limit_sse_rpm = _read_int_env("MCP_RATE_LIMIT_SSE_RPM", 10)
+        rate_limit_hash_secret = os.getenv("MCP_RATE_LIMIT_HASH_SECRET")
+
+        rl_disable_allowed = rate_limit_allow_disable and env in {"dev", "local"}
+        if not rl_disable_allowed:
+            if rate_limit_rpm <= 0:
+                raise ValueError("MCP_RATE_LIMIT_RPM must be greater than zero")
+        if rate_limit_window_s <= 0:
+            raise ValueError("MCP_RATE_LIMIT_WINDOW_S must be greater than zero")
+        if rate_limit_max_keys <= 0:
+            raise ValueError("MCP_RATE_LIMIT_MAX_KEYS must be greater than zero")
+        if rate_limit_ttl_windows <= 0:
+            raise ValueError("MCP_RATE_LIMIT_TTL_WINDOWS must be greater than zero")
+
         return cls(
             host=os.getenv("FASTMCP_HOST", cls.host),
             port=int(os.getenv("FASTMCP_PORT", cls.port)),
@@ -206,6 +233,13 @@ class HttpConfig:
             request_timeout_s=request_timeout_s,
             timeout_status=timeout_status,
             allow_disable_limits=allow_disable_limits,
+            rate_limit_rpm=rate_limit_rpm,
+            rate_limit_window_s=rate_limit_window_s,
+            rate_limit_allow_disable=rate_limit_allow_disable,
+            rate_limit_max_keys=rate_limit_max_keys,
+            rate_limit_ttl_windows=rate_limit_ttl_windows,
+            rate_limit_sse_rpm=rate_limit_sse_rpm,
+            rate_limit_hash_secret=rate_limit_hash_secret,
         )
 
 
