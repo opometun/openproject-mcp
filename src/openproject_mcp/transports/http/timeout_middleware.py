@@ -35,11 +35,14 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             payload = {
                 "error": ERROR_TIMEOUT,
                 "message": "Request timed out",
+                "request_id": getattr(request.state, "request_id", ""),
             }
+            rid = getattr(request.state, "request_id", "")
             return Response(
                 json.dumps(payload),
                 status_code=self.cfg.timeout_status,
                 media_type="application/json",
+                headers={"X-Request-Id": rid} if rid else None,
             )
 
 

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 
 from . import hal
+from .observability import log_event
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -72,6 +73,7 @@ class OpenProjectClient:
         retry: Optional[RetryConfig] = None,
         logger: Optional[logging.Logger] = None,
         http: Optional[httpx.AsyncClient] = None,
+        request_id: Optional[str] = None,
     ):
         base_url = (base_url or "").rstrip("/")
         api_key = api_key or ""
@@ -85,6 +87,7 @@ class OpenProjectClient:
         self.timeout_seconds = timeout_seconds
         self.retry = retry if retry is not None else RetryConfig()
         self.log = logger or logging.getLogger("openproject_mcp.client")
+        self.request_id = request_id
 
         # Prefer httpx basic auth rather than manual base64 encoding
         auth = httpx.BasicAuth("apikey", api_key)
@@ -96,6 +99,7 @@ class OpenProjectClient:
             headers={
                 "Accept": "application/hal+json",
                 "Content-Type": "application/json",
+                **({"X-Request-Id": self.request_id} if self.request_id else {}),
             },
             timeout=timeout_seconds,
         )
@@ -145,21 +149,27 @@ class OpenProjectClient:
         while True:
             try:
                 resp = await self.http.request(
-                    method, req_url, params=params, json=json
+                    method,
+                    req_url,
+                    params=params,
+                    json=json,
+                    headers={"X-Request-Id": self.request_id}
+                    if self.request_id
+                    else None,
                 )
                 duration_ms = int((time.perf_counter() - start) * 1000)
 
                 # structured-ish log without secrets
-                self.log.debug(
-                    "op.request",
-                    extra={
-                        "tool": tool,
-                        "method": method,
-                        "url": str(resp.request.url),
-                        "status": resp.status_code,
-                        "duration_ms": duration_ms,
-                        "attempt": attempt,
-                    },
+                log_event(
+                    "op_call",
+                    tool=tool,
+                    method=method,
+                    path=str(resp.request.url).split("?")[0],
+                    endpoint=req_url,
+                    status=resp.status_code,
+                    duration_ms=duration_ms,
+                    attempt=attempt,
+                    request_id=self.request_id,
                 )
 
                 # Retry certain status codes
@@ -184,12 +194,36 @@ class OpenProjectClient:
                     await asyncio.sleep(self.retry.backoff_base_seconds * (2**attempt))
                     attempt += 1
                     continue
+                log_event(
+                    "op_call",
+                    tool=tool,
+                    method=method,
+                    path=req_url,
+                    endpoint=req_url,
+                    status="exception",
+                    duration_ms=int((time.perf_counter() - start) * 1000),
+                    attempt=attempt,
+                    request_id=self.request_id,
+                    error_type=type(exc).__name__,
+                )
                 raise OpenProjectClientError(
                     f"Network/timeout error calling {method} {url}: {exc}"
                 ) from exc
 
             except httpx.HTTPError as exc:
                 # Other httpx exceptions (rare) - do not blindly retry
+                log_event(
+                    "op_call",
+                    tool=tool,
+                    method=method,
+                    path=req_url,
+                    endpoint=req_url,
+                    status="exception",
+                    duration_ms=int((time.perf_counter() - start) * 1000),
+                    attempt=attempt,
+                    request_id=self.request_id,
+                    error_type=type(exc).__name__,
+                )
                 raise OpenProjectClientError(
                     f"HTTPX error calling {method} {url}: {exc}"
                 ) from exc

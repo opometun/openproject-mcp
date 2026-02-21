@@ -41,6 +41,11 @@ def ensure_request_id(candidate: Optional[str] = None) -> str:
     return candidate or uuid.uuid4().hex
 
 
+def current_request_id() -> str:
+    """Return the current request id or generate one if absent."""
+    return ensure_request_id(_request_id_var.get())
+
+
 def seed_from_env(*, use_dotenv: bool = False) -> RequestContext:
     base_url, api_key = load_env_config(use_dotenv=use_dotenv)
     if not base_url:
@@ -88,7 +93,9 @@ def apply_request_context(
 
 def client_from_context() -> OpenProjectClient:
     ctx = get_context(require_api_key=True, require_base_url=True)
-    return OpenProjectClient(base_url=ctx.base_url, api_key=ctx.api_key)
+    return OpenProjectClient(
+        base_url=ctx.base_url, api_key=ctx.api_key, request_id=ctx.request_id
+    )
 
 
 def reset_context(tokens: Iterable[Token]) -> None:
@@ -127,6 +134,7 @@ __all__ = [
     "apply_request_context",
     "reset_context",
     "ensure_request_id",
+    "current_request_id",
     "client_from_context",
     "API_KEY_HEADER",
     "REQUEST_ID_HEADER",

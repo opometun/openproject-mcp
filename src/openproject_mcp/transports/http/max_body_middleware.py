@@ -36,7 +36,7 @@ class MaxBodyMiddleware(BaseHTTPMiddleware):
                 length = None
             else:
                 if length > self.cfg.max_body_bytes:
-                    return self._too_large()
+                    return self._too_large(getattr(request.state, "request_id", ""))
 
         total = 0
         chunks: list[bytes] = []
@@ -44,7 +44,7 @@ class MaxBodyMiddleware(BaseHTTPMiddleware):
         async for chunk in request.stream():
             total += len(chunk)
             if total > self.cfg.max_body_bytes:
-                return self._too_large()
+                return self._too_large(getattr(request.state, "request_id", ""))
             chunks.append(chunk)
 
         body = b"".join(chunks)
@@ -54,17 +54,19 @@ class MaxBodyMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
     @staticmethod
-    def _payload():
+    def _payload(request_id: str | None):
         return {
             "error": ERROR_PAYLOAD_TOO_LARGE,
             "message": "Body exceeds limit",
+            "request_id": request_id or "",
         }
 
-    def _too_large(self) -> Response:
+    def _too_large(self, request_id: str) -> Response:
         return Response(
-            json.dumps(self._payload()),
+            json.dumps(self._payload(request_id)),
             status_code=413,
             media_type="application/json",
+            headers={"X-Request-Id": request_id} if request_id else None,
         )
 
 

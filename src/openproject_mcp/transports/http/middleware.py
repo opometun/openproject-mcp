@@ -32,16 +32,17 @@ class ContextMiddleware(BaseHTTPMiddleware):
             env_ctx.api_key if env_ctx else None
         )
         base_url = env_ctx.base_url if env_ctx else None
-        request_id = request.headers.get(REQUEST_ID_HEADER)
+        request_id = getattr(request.state, "request_id", None) or request.headers.get(
+            REQUEST_ID_HEADER
+        )
         user_agent = request.headers.get("User-Agent")
 
-        tokens = []
-        ctx_request_id = request_id
+        ctx_request_id = (
+            request.state.request_id if hasattr(request.state, "request_id") else None
+        )
         if not ctx_request_id:
-            # ensure we have an ID even for early errors
             ctx_request_id = request.headers.get(REQUEST_ID_HEADER) or ""
 
-        tokens = []
         try:
             tokens = list(
                 apply_request_context(
