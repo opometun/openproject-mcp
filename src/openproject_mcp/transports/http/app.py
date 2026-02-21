@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Dict
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from starlette.responses import Response
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response
 
+from openproject_mcp.core.config import load_env_config
 from openproject_mcp.core.context import client_from_context
 from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
@@ -14,6 +17,7 @@ from openproject_mcp.transports.http.config import HttpConfig
 from openproject_mcp.transports.http.max_body_middleware import MaxBodyMiddleware
 from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
 from openproject_mcp.transports.http.middleware import ContextMiddleware
+from openproject_mcp.transports.http.ops import build_readiness_status, is_ops_path
 from openproject_mcp.transports.http.origin_cors_middleware import (
     OriginCorsMiddleware,
     dev_localhost_allowlist,
@@ -89,29 +93,92 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
     return fastmcp
 
 
+def _compute_readiness_state() -> Dict[str, bool]:
+    base_url, api_key = load_env_config(use_dotenv=False)
+
+    # API key can be overridden per request; base_url currently not
+    header_override_supported = True
+
+    return {
+        "config_loaded": True,
+        "limiter_config_valid": True,
+        "default_base_url_present": bool(base_url),
+        "default_api_key_present": bool(api_key),
+        "header_override_supported": header_override_supported,
+    }
+
+
+def _build_ops_app(readiness_state: Dict[str, bool]) -> Starlette:
+    async def healthz(_request):
+        return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
+
+    async def readyz(_request):
+        payload = build_readiness_status(readiness_state)
+        status_code = 200 if payload["status"] == "ok" else 503
+        return JSONResponse(
+            payload,
+            status_code=status_code,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    ops_app = Starlette()
+    ops_app.add_route("/healthz", healthz, methods=["GET"])
+    ops_app.add_route("/readyz", readyz, methods=["GET"])
+    return ops_app
+
+
+class OpsDispatcher:
+    """
+    ASGI wrapper that routes ops endpoints to a minimal app and everything else to the main app.
+    Exposes router/state so existing tests using lifespan_context keep working.
+    """  # noqa: E501
+
+    def __init__(self, ops_app, main_app):
+        self.ops_app = ops_app
+        self.main_app = main_app
+        self.router = main_app.router
+        self.state = main_app.state
+        # Propagate lifespan handler if present
+        if hasattr(main_app, "lifespan"):
+            self.lifespan = main_app.lifespan
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if is_ops_path(path):
+            await self.ops_app(scope, receive, send)
+            return
+        await self.main_app(scope, receive, send)
+
+
 def build_http_app(cfg: HttpConfig | None = None):
-    """Return a Starlette app ready to serve Streamable HTTP requests."""
+    """Return an ASGI app that dispatches ops endpoints before the main FastMCP app."""
     cfg = cfg or HttpConfig.from_env()
     fastmcp = build_fastmcp(cfg)
-    app = fastmcp.streamable_http_app()
+    main_app = fastmcp.streamable_http_app()
     # Add from innermost to outermost (Starlette inserts at front), desired exec:
     # Security -> Origin -> RequestId -> Timeout -> Accept -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
-    app.add_middleware(MessageHandlingMiddleware)
-    app.add_middleware(MaxBodyMiddleware, cfg=cfg)
-    app.add_middleware(RateLimitMiddleware, cfg=cfg)
-    app.add_middleware(ContextMiddleware)
-    app.add_middleware(AcceptMiddleware)
-    app.add_middleware(TimeoutMiddleware, cfg=cfg)
-    app.add_middleware(RequestIdMiddleware)
-    app.add_middleware(OriginCorsMiddleware, cfg=cfg)
-    app.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
+    main_app.add_middleware(MessageHandlingMiddleware)
+    main_app.add_middleware(MaxBodyMiddleware, cfg=cfg)
+    main_app.add_middleware(RateLimitMiddleware, cfg=cfg)
+    main_app.add_middleware(ContextMiddleware)
+    main_app.add_middleware(AcceptMiddleware)
+    main_app.add_middleware(TimeoutMiddleware, cfg=cfg)
+    main_app.add_middleware(RequestIdMiddleware)
+    main_app.add_middleware(OriginCorsMiddleware, cfg=cfg)
+    main_app.add_middleware(SecurityHeadersMiddleware, cfg=cfg)
     # Mount SSE endpoint separately
-    app.mount(
+    main_app.mount(
         "/mcp-sse",
         _build_sse_app(fastmcp, cfg),
         name="mcp-sse",
     )
-    return app
+
+    readiness_state = _compute_readiness_state()
+    main_app.state.readiness = readiness_state
+
+    ops_app = _build_ops_app(readiness_state)
+
+    return OpsDispatcher(ops_app, main_app)
 
 
 def _build_sse_app(fastmcp: FastMCP, cfg: HttpConfig):
