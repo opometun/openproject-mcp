@@ -4,10 +4,13 @@ import importlib
 import inspect
 import logging
 import pkgutil
+import time
 from types import ModuleType
 from typing import Callable, Iterable, List, Set, get_origin, get_type_hints
 
 from .client import OpenProjectClient
+from .context import current_request_id, ensure_request_id, get_context
+from .observability import log_event
 
 log = logging.getLogger("openproject_mcp.core.registry")
 
@@ -98,7 +101,42 @@ def _wrap_tool(
 
     async def wrapped(*args, **kwargs):
         client = client_provider()
-        return await func(client, *args, **kwargs)
+        try:
+            ctx = get_context(require_api_key=False, require_base_url=False)
+            rid = ensure_request_id(ctx.request_id)
+        except Exception:
+            rid = ensure_request_id(current_request_id())
+
+        start = time.perf_counter()
+        log_event(
+            "tool_start",
+            tool=func.__name__,
+            request_id=rid,
+        )
+        status = "ok"
+        try:
+            result = await func(client, *args, **kwargs)
+            return result
+        except Exception as exc:
+            status = "error"
+            log_event(
+                "tool_finish",
+                tool=func.__name__,
+                request_id=rid,
+                status=status,
+                error_type=type(exc).__name__,
+                duration_ms=int((time.perf_counter() - start) * 1000),
+            )
+            raise
+        finally:
+            if status == "ok":
+                log_event(
+                    "tool_finish",
+                    tool=func.__name__,
+                    request_id=rid,
+                    status=status,
+                    duration_ms=int((time.perf_counter() - start) * 1000),
+                )
 
     wrapped.__name__ = func.__name__
     wrapped.__doc__ = func.__doc__

@@ -149,6 +149,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not self._applies(request):
             return await call_next(request)
 
+        rid = getattr(request.state, "request_id", "")
         now = time.time()
         api_key = request.headers.get("X-OpenProject-Key") or ""
         allowed, remaining, retry_after = await self.limiter.check_and_increment(
@@ -157,19 +158,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         reset_epoch = self.limiter.reset_epoch(now)
 
         if not allowed:
-            return self._limited_response(retry_after, reset_epoch)
+            return self._limited_response(retry_after, reset_epoch, rid)
 
         response: Response = await call_next(request)
-        self._apply_headers(response, remaining, reset_epoch)
+        self._apply_headers(response, remaining, reset_epoch, rid)
         return response
 
-    def _limited_response(self, retry_after: int, reset_epoch: int) -> Response:
+    def _limited_response(
+        self, retry_after: int, reset_epoch: int, request_id: str
+    ) -> Response:
         payload = {
             "error": "rate_limited",
             "message": "Rate limit exceeded",
             "retry_after_s": retry_after,
+            "request_id": request_id,
         }
-        headers = self._rate_headers(0, reset_epoch)
+        headers = self._rate_headers(0, reset_epoch, request_id)
         headers["Retry-After"] = str(retry_after)
         return Response(
             json.dumps(payload),
@@ -179,19 +183,24 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
     def _apply_headers(
-        self, response: Response, remaining: int, reset_epoch: int
+        self, response: Response, remaining: int, reset_epoch: int, request_id: str
     ) -> None:
-        headers = self._rate_headers(remaining, reset_epoch)
+        headers = self._rate_headers(remaining, reset_epoch, request_id)
         for k, v in headers.items():
             response.headers.setdefault(k, v)
 
-    def _rate_headers(self, remaining: int, reset_epoch: int) -> Dict[str, str]:
-        return {
+    def _rate_headers(
+        self, remaining: int, reset_epoch: int, request_id: str
+    ) -> Dict[str, str]:
+        headers = {
             "X-RateLimit-Limit": str(self.cfg.rate_limit_rpm),
             "X-RateLimit-Remaining": str(remaining),
             "X-RateLimit-Reset": str(reset_epoch),
             "X-RateLimit-Policy": f"fixed-window;w={self.cfg.rate_limit_window_s};limit={self.cfg.rate_limit_rpm}",  # noqa: E501
         }
+        if request_id:
+            headers["X-Request-Id"] = request_id
+        return headers
 
 
 class SSEHandshakeRateLimitMiddleware(BaseHTTPMiddleware):
@@ -216,6 +225,7 @@ class SSEHandshakeRateLimitMiddleware(BaseHTTPMiddleware):
         if not self._applies(request):
             return await call_next(request)
 
+        rid = getattr(request.state, "request_id", "")
         now = time.time()
         api_key = request.headers.get("X-OpenProject-Key") or ""
         allowed, remaining, retry_after = await self.limiter.check_and_increment(
@@ -228,6 +238,7 @@ class SSEHandshakeRateLimitMiddleware(BaseHTTPMiddleware):
                 "error": "rate_limited",
                 "message": "SSE rate limit exceeded",
                 "retry_after_s": retry_after,
+                "request_id": rid,
             }
             headers = {
                 "Retry-After": str(retry_after),
@@ -236,6 +247,8 @@ class SSEHandshakeRateLimitMiddleware(BaseHTTPMiddleware):
                 "X-RateLimit-Reset": str(reset_epoch),
                 "X-RateLimit-Policy": f"fixed-window;w={self.cfg.rate_limit_window_s};limit={self.cfg.rate_limit_sse_rpm}",  # noqa: E501
             }
+            if rid:
+                headers["X-Request-Id"] = rid
             return Response(
                 json.dumps(payload),
                 status_code=429,
@@ -253,6 +266,8 @@ class SSEHandshakeRateLimitMiddleware(BaseHTTPMiddleware):
             "X-RateLimit-Policy",
             f"fixed-window;w={self.cfg.rate_limit_window_s};limit={self.cfg.rate_limit_sse_rpm}",
         )
+        if rid:
+            response.headers.setdefault("X-Request-Id", rid)
         return response
 
 

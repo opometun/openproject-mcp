@@ -40,12 +40,16 @@ def _build_vary(value_list: Iterable[str]) -> str:
 
 
 def _error_response(
-    status: int, code: str, message: str, vary: str | None = None
+    status: int, code: str, message: str, vary: str | None = None, request_id: str = ""
 ) -> Response:
     body = {"error": code, "message": message}
+    if request_id:
+        body["request_id"] = request_id
     headers = {"content-type": "application/json"}
     if vary:
         headers["vary"] = vary
+    if request_id:
+        headers["X-Request-Id"] = request_id
     return Response(json.dumps(body), status_code=status, headers=headers)
 
 
@@ -69,13 +73,16 @@ class OriginCorsMiddleware(BaseHTTPMiddleware):
         origin_header = request.headers.get("origin")
 
         if origin_header:
+            rid = getattr(request.state, "request_id", "")
             try:
                 origin = _parse_origin_header(origin_header)
             except ValueError as exc:
-                return _error_response(403, "origin_denied", str(exc))
+                return _error_response(403, "origin_denied", str(exc), request_id=rid)
 
             if not self._origin_allowed(origin):
-                return _error_response(403, "origin_denied", "Origin not allowed")
+                return _error_response(
+                    403, "origin_denied", "Origin not allowed", request_id=rid
+                )
 
             # Handle preflight
             if request.method.upper() == "OPTIONS" and request.url.path in {

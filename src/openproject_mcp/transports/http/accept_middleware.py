@@ -48,28 +48,34 @@ class AcceptMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
         # Handle GET /mcp early: SSE is disabled
         if request.method.upper() == "GET" and request.url.path == "/mcp":
+            rid = getattr(request.state, "request_id", "")
             return Response(
                 json.dumps(
                     {
                         "error": "method_not_allowed",
                         "message": "SSE is disabled; GET /mcp not supported.",
+                        "request_id": rid,
                     }
                 ),
                 status_code=405,
                 media_type="application/json",
+                headers={"X-Request-Id": rid} if rid else None,
             )
 
         has_json, has_sse = _parse_accept(request.headers.get("accept"))
         if not has_json and has_sse:
+            rid = getattr(request.state, "request_id", "")
             return Response(
                 json.dumps(
                     {
                         "error": "not_acceptable",
                         "message": "SSE is disabled; use Accept: application/json.",
+                        "request_id": rid,
                     }
                 ),
                 status_code=406,
                 media_type="application/json",
+                headers={"X-Request-Id": rid} if rid else None,
             )
 
         return await call_next(request)

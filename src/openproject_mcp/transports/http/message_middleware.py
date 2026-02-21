@@ -11,12 +11,16 @@ PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
 
 
-def _json_rpc_error(code: int, message: str, http_status: int = 400) -> Response:
+def _json_rpc_error(
+    code: int, message: str, http_status: int = 400, request_id: str = ""
+) -> Response:
     payload = {
         "jsonrpc": "2.0",
         "id": None,
         "error": {"code": code, "message": message},
     }
+    if request_id:
+        payload["request_id"] = request_id
     return Response(
         json.dumps(payload),
         status_code=http_status,
@@ -85,11 +89,17 @@ class MessageHandlingMiddleware(BaseHTTPMiddleware):
         try:
             data = json.loads(raw_body) if raw_body else {}
         except json.JSONDecodeError:
-            return _json_rpc_error(PARSE_ERROR, "Parse error", http_status=400)
+            rid = getattr(request.state, "request_id", "")
+            return _json_rpc_error(
+                PARSE_ERROR, "Parse error", http_status=400, request_id=rid
+            )
 
         kind, valid = _classify_payload(data)
         if not valid:
-            return _json_rpc_error(INVALID_REQUEST, "Invalid Request", http_status=400)
+            rid = getattr(request.state, "request_id", "")
+            return _json_rpc_error(
+                INVALID_REQUEST, "Invalid Request", http_status=400, request_id=rid
+            )
 
         if kind == "notification_only":
             return Response(status_code=202, media_type="application/json", content="")
