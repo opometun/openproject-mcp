@@ -29,3 +29,9 @@ The script prints human-readable steps and exits non-zero on failure.
 - Run: `docker run -p 8000:8000 -e OPENPROJECT_BASE_URL=http://example.com -e OPENPROJECT_API_KEY=your-key openproject-mcp`
 - Health endpoints: `GET /healthz`, `GET /readyz`
 - API key can also be supplied per request via the `X-OpenProject-Key` header.
+
+## Run modes (quick)
+- **HTTP (default):** `python -m openproject_mcp.transports.http.main` or the Docker run above. Requires `OPENPROJECT_BASE_URL`; API key via env or `X-OpenProject-Key`. Accept rules: missing/`*/*`/`application/json` are allowed; `text/event-stream` only → 406 when SSE disabled. `GET /mcp` → 405 when SSE disabled. Health: `/healthz`, `/readyz`.
+- **Stdio:** `python -m openproject_mcp.transports.stdio.main`. Seeds ContextVars once from env (`OPENPROJECT_BASE_URL`, `OPENPROJECT_API_KEY`); no headers used.
+
+See `docs/transport.md` for the canonical defaults table (limits, timeouts, rate limits, CORS, host/port/path) and troubleshooting.
