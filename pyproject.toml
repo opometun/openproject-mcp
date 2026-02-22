@@ -5,7 +5,7 @@ description = "A Model Context Protocol server for OpenProject"
 requires-python = ">=3.11"
 readme = "README.md"
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "Oleksandr Pometun", email = "43117125+opometun@users.noreply.github.com" }
 ]
 dependencies = [
     "mcp[cli]>=1.11.0,!=1.12.0,!=1.12.1",
