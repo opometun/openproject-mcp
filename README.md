@@ -23,3 +23,9 @@ The script prints human-readable steps and exits non-zero on failure.
 - Core, transport-agnostic code lives in `openproject_mcp/core/`.
 - Transports live in `openproject_mcp/transports/{stdio,http}/`.
 - Compatibility shims keep `openproject_mcp.client`, `hal`, `models`, and `server_registry` working; prefer the new `openproject_mcp.core.*` imports. Shims are slated for removal in a future release.
+
+## Docker (HTTP transport)
+- Build: `docker build -t openproject-mcp .`
+- Run: `docker run -p 8000:8000 -e OPENPROJECT_BASE_URL=http://example.com -e OPENPROJECT_API_KEY=your-key openproject-mcp`
+- Health endpoints: `GET /healthz`, `GET /readyz`
+- API key can also be supplied per request via the `X-OpenProject-Key` header.
