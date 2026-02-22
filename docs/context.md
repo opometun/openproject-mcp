@@ -7,15 +7,14 @@
 - `user_agent` (optional)
 
 ## Precedence
-- HTTP adapter: headers for `X-OpenProject-Key`; base URL comes only from env defaults (header override not supported in 2.3); request_id uses `X-Request-Id` if present, otherwise generated.
-- Stdio: env defaults (`OPENPROJECT_BASE_URL`, `OPENPROJECT_API_KEY`), request_id generated.
-- Missing api_key ⇒ 401; missing base_url (no env) ⇒ 500 (server misconfig).
+- HTTP: `X-OpenProject-Key` header overrides env; `X-Request-Id` optional; base_url comes **only** from env defaults (header override not supported/ignored). Missing api_key ⇒ 401; missing base_url ⇒ 500.
+- Stdio: env defaults (`OPENPROJECT_BASE_URL`, `OPENPROJECT_API_KEY`), request_id generated at startup; no per-request headers.
 
 ## Header contract (HTTP)
 - `X-OpenProject-Key`: required
 - `X-Request-Id`: optional; echoed back if provided, otherwise generated
 - `User-Agent`: optional
-- Base URL header not supported in 2.3.
+- Base URL header: not implemented/ignored; base_url is env-only.
 
 ## Error responses (HTTP middleware)
 ```json
@@ -25,6 +24,10 @@
 ```
 Status: 401 for missing API key; 500 for missing base URL.
 Response header: `X-Request-Id`.
+
+## Runtime behavior
+- ContextVars are set per request (HTTP) or once at startup (stdio) and then reused; hot-path code does **not** read env again after seeding.
+- Request IDs propagate into tool logs and outbound OpenProject client calls (`X-Request-Id` header added when present).
 
 ## Core helper
 - `openproject_mcp.core.context.get_context()` → `RequestContext(api_key, base_url, request_id, user_agent)`; raises `MissingApiKeyError` / `MissingBaseUrlError` per require flags.
