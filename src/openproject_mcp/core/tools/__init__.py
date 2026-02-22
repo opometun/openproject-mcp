@@ -7,13 +7,8 @@ when they need to be exposed for discovery/registration.
 
 # Keeping this file explicit to ensure the package is importable during tests.
 
-# Tool modules
-from .attachments import (
-    attach_file_to_wp,
-    download_attachment,
-    get_attachment_content,
-    list_attachments,
-)
+import os
+
 from .memberships import get_project_memberships
 from .metadata import (
     AmbiguousResolutionError,
@@ -51,6 +46,22 @@ from .work_packages import (
     update_work_package,
 )
 
+_disable_attachments = os.getenv("MCP_DISABLE_ATTACHMENTS", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+# Tool modules
+if not _disable_attachments:
+    from .attachments import (  # noqa: F401
+        attach_file_to_wp,
+        download_attachment,
+        get_attachment_content,
+        list_attachments,
+    )
+
 __all__ = [
     "list_types",
     "list_statuses",
@@ -71,10 +82,6 @@ __all__ = [
     "get_project_summary",
     "list_queries",
     "run_query",
-    "attach_file_to_wp",
-    "list_attachments",
-    "download_attachment",
-    "get_attachment_content",
     "get_project_memberships",
     "system_ping",
     "add_comment",
@@ -94,3 +101,13 @@ __all__ = [
     "get_user_by_id",
     "get_users",
 ]
+
+if not _disable_attachments:
+    __all__.extend(
+        [
+            "attach_file_to_wp",
+            "list_attachments",
+            "download_attachment",
+            "get_attachment_content",
+        ]
+    )
