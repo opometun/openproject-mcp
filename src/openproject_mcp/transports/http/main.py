@@ -12,7 +12,13 @@ def main() -> None:
     setup_logging()
     cfg = HttpConfig.from_env()
     app = build_http_app(cfg)
-    uvicorn.run(app, host=cfg.host, port=cfg.port, log_level="info")
+    uvicorn.run(
+        app,
+        host=cfg.host,
+        port=cfg.port,
+        log_level="info",
+        timeout_graceful_shutdown=10,
+    )
 
 
 if __name__ == "__main__":
