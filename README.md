@@ -35,3 +35,19 @@ The script prints human-readable steps and exits non-zero on failure.
 - **Stdio:** `python -m openproject_mcp.transports.stdio.main`. Seeds ContextVars once from env (`OPENPROJECT_BASE_URL`, `OPENPROJECT_API_KEY`); no headers used.
 
 See `docs/transport.md` for the canonical defaults table (limits, timeouts, rate limits, CORS, host/port/path) and troubleshooting.
+
+## Unified CLI (openproject-mcp)
+Install (editable or wheel) then use the single entrypoint:
+
+```bash
+openproject-mcp stdio
+openproject-mcp http --host 0.0.0.0 --port 8080
+```
+
+Config & precedence (highest → lowest):
+1) CLI flags (`--host`, `--port`, `--log-level`, `--config`)
+2) Environment (`MCP_HTTP_HOST`, `MCP_HTTP_PORT`, `MCP_LOG_LEVEL`/`OPENPROJECT_LOG_LEVEL`)
+3) TOML config file if provided via `--config` (keys: `host`, `port`, `log_level`)
+4) Defaults: host `127.0.0.1`, port `8080`, log-level `info`
+
+Logging: stdio mode logs to stderr only; HTTP uses standard stderr logging (uvicorn-compatible).

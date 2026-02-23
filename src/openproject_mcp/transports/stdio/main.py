@@ -10,12 +10,10 @@ from openproject_mcp.core.context import (
     reset_context,
     seed_from_env,
 )
-from openproject_mcp.core.logging import setup_logging
 from openproject_mcp.core.registry import register_discovered_tools
 
 
-async def main() -> None:
-    setup_logging()
+async def run_stdio() -> None:
     # Seed ContextVars from env (stdio bootstrap)
     ctx = seed_from_env(use_dotenv=True)
     tokens = list(
@@ -33,6 +31,13 @@ async def main() -> None:
 
     await app.run_stdio_async()
     reset_context(tokens)
+
+
+async def main() -> None:
+    from openproject_mcp.core.logging import setup_logging
+
+    setup_logging()
+    await run_stdio()
 
 
 if __name__ == "__main__":
