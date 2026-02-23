@@ -5,6 +5,7 @@ from openproject_mcp.core.context import (
     MissingApiKeyError,
     MissingBaseUrlError,
     apply_request_context,
+    extract_api_key,
     get_context,
     reset_context,
     seed_from_env,
@@ -49,3 +50,50 @@ def test_request_id_generated():
     ctx = get_context()
     uuid.UUID(hex=ctx.request_id)  # should parse
     reset_context(tokens)
+
+
+# ---------------------------------------------------------------------------
+# extract_api_key unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestExtractApiKey:
+    """Verify the header cascade: X-OpenProject-Key > Bearer > X-API-Key > fallback."""
+
+    def test_x_openproject_key_wins(self):
+        headers = {
+            "X-OpenProject-Key": "custom",
+            "Authorization": "Bearer bearer-val",
+            "X-API-Key": "xapi-val",
+        }
+        assert extract_api_key(headers) == "custom"
+
+    def test_bearer_used_when_no_custom_header(self):
+        headers = {"Authorization": "Bearer bearer-val", "X-API-Key": "xapi-val"}
+        assert extract_api_key(headers) == "bearer-val"
+
+    def test_x_api_key_used_when_no_bearer(self):
+        headers = {"X-API-Key": "xapi-val"}
+        assert extract_api_key(headers) == "xapi-val"
+
+    def test_fallback_used_when_no_headers(self):
+        assert extract_api_key({}, fallback="fb") == "fb"
+
+    def test_none_when_no_headers_no_fallback(self):
+        assert extract_api_key({}) is None
+
+    def test_bearer_case_insensitive(self):
+        headers = {"Authorization": "BEARER upper-case"}
+        assert extract_api_key(headers) == "upper-case"
+
+    def test_basic_auth_ignored(self):
+        headers = {"Authorization": "Basic dXNlcjpwYXNz"}
+        assert extract_api_key(headers) is None
+
+    def test_empty_bearer_token_ignored(self):
+        headers = {"Authorization": "Bearer "}
+        assert extract_api_key(headers, fallback="fb") == "fb"
+
+    def test_bearer_with_extra_whitespace(self):
+        headers = {"Authorization": "Bearer   spaced-key  "}
+        assert extract_api_key(headers) == "spaced-key"

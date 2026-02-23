@@ -17,6 +17,8 @@ _request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 _user_agent_var: ContextVar[str | None] = ContextVar("user_agent", default=None)
 
 API_KEY_HEADER = "x-openproject-key"
+AUTHORIZATION_HEADER = "authorization"
+X_API_KEY_HEADER = "x-api-key"
 REQUEST_ID_HEADER = "x-request-id"
 USER_AGENT_HEADER = "user-agent"
 
@@ -35,6 +37,34 @@ class RequestContext:
     base_url: str
     request_id: str
     user_agent: Optional[str] = None
+
+
+def extract_api_key(
+    headers: Mapping[str, str], fallback: str | None = None
+) -> str | None:
+    """Extract API key from request headers using a standard cascade.
+
+    Priority:
+      1. X-OpenProject-Key  (custom, backward-compatible)
+      2. Authorization: Bearer <token>
+      3. X-API-Key  (common convention)
+      4. *fallback* (typically the env-configured key)
+    """
+    key = headers.get(API_KEY_HEADER) or headers.get("X-OpenProject-Key")
+    if key:
+        return key
+
+    auth = headers.get(AUTHORIZATION_HEADER) or headers.get("Authorization") or ""
+    if auth.lower().startswith("bearer "):
+        token = auth.split(" ", 1)[1].strip()
+        if token:
+            return token
+
+    key = headers.get(X_API_KEY_HEADER) or headers.get("X-API-Key")
+    if key:
+        return key
+
+    return fallback
 
 
 def ensure_request_id(candidate: Optional[str] = None) -> str:
@@ -60,11 +90,9 @@ def seed_from_env(*, use_dotenv: bool = False) -> RequestContext:
 
 def seed_from_headers(headers: Mapping[str, str]) -> RequestContext:
     """Extract context hints from HTTP headers (api_key required, base_url not overridden)."""  # noqa: E501
-    api_key = headers.get(API_KEY_HEADER)
     base_url_env, api_key_env = load_env_config()
     base_url = base_url_env or None
-    if api_key is None:
-        api_key = api_key_env or None
+    api_key = extract_api_key(headers, fallback=api_key_env)
     request_id = ensure_request_id(headers.get(REQUEST_ID_HEADER))
     user_agent = headers.get(USER_AGENT_HEADER)
     # Validation deferred to get_context to allow adapters to decide semantics
@@ -136,7 +164,10 @@ __all__ = [
     "ensure_request_id",
     "current_request_id",
     "client_from_context",
+    "extract_api_key",
     "API_KEY_HEADER",
+    "AUTHORIZATION_HEADER",
+    "X_API_KEY_HEADER",
     "REQUEST_ID_HEADER",
     "USER_AGENT_HEADER",
 ]
