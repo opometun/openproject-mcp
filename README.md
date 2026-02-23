@@ -51,3 +51,9 @@ Config & precedence (highest → lowest):
 4) Defaults: host `127.0.0.1`, port `8080`, log-level `info`
 
 Logging: stdio mode logs to stderr only; HTTP uses standard stderr logging (uvicorn-compatible).
+
+## Installation
+- Base (stdio only): `pip install openproject-mcp`
+- HTTP transport: `pip install "openproject-mcp[http]"`
+
+Dockerfile already installs the HTTP extra; local HTTP runs need the extra or you’ll see a friendly error telling you to install it.

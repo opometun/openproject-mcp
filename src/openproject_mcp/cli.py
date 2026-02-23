@@ -8,8 +8,6 @@ from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
 from openproject_mcp.core.logging import setup_logging
-from openproject_mcp.transports.http.main import run_http
-from openproject_mcp.transports.stdio.main import run_stdio
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
@@ -102,8 +100,17 @@ def main(argv: Optional[list[str]] = None) -> None:
     setup_logging(cfg.log_level.upper())
 
     if args.command == "stdio":
+        from openproject_mcp.transports.stdio.main import run_stdio
+
         asyncio.run(run_stdio())
     elif args.command == "http":
+        try:
+            from openproject_mcp.transports.http.main import run_http
+        except ImportError:
+            raise SystemExit(  # noqa: B904
+                "HTTP transport requires extra dependencies.\n"
+                "Install with: pip install 'openproject-mcp[http]'"
+            )
         run_http(cfg.host, cfg.port)
     else:  # pragma: no cover - argparse enforces choices
         parser.error(f"Unknown command {args.command}")

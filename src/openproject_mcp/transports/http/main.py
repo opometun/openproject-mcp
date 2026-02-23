@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import uvicorn
-
-from .app import build_http_app
-from .config import HttpConfig
-
 
 def run_http(host: str | None = None, port: int | None = None) -> None:
+    try:
+        import uvicorn  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError(
+            "HTTP transport requires extra dependencies. "
+            "Install with: pip install 'openproject-mcp[http]'"
+        ) from exc
+
+    from .app import build_http_app
+    from .config import HttpConfig
+
     cfg = HttpConfig.from_env()
     if host or port:
         cfg = replace(cfg, host=host or cfg.host, port=port or cfg.port)
