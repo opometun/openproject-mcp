@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict
 
-OPS_PATHS = {"/healthz", "/readyz"}
+OPS_PATHS = {"/healthz", "/readyz", "/.well-known/oauth-protected-resource"}
 
 
 def is_ops_path(path: str | None) -> bool:

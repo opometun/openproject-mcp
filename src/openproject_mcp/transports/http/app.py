@@ -8,11 +8,13 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
 
 from openproject_mcp.core.config import load_env_config
 from openproject_mcp.core.context import client_from_context
 from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
+from openproject_mcp.transports.http.auth_middleware import AuthMiddleware
 from openproject_mcp.transports.http.config import HttpConfig
 from openproject_mcp.transports.http.max_body_middleware import MaxBodyMiddleware
 from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
@@ -108,7 +110,7 @@ def _compute_readiness_state() -> Dict[str, bool]:
     }
 
 
-def _build_ops_app(readiness_state: Dict[str, bool]) -> Starlette:
+def _build_ops_app(readiness_state: Dict[str, bool], cfg: HttpConfig) -> Starlette:
     async def healthz(_request):
         return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
 
@@ -121,10 +123,29 @@ def _build_ops_app(readiness_state: Dict[str, bool]) -> Starlette:
             headers={"Cache-Control": "no-store"},
         )
 
-    ops_app = Starlette()
-    ops_app.add_route("/healthz", healthz, methods=["GET"])
-    ops_app.add_route("/readyz", readyz, methods=["GET"])
-    return ops_app
+    routes = [
+        Route("/healthz", healthz, methods=["GET"]),
+        Route("/readyz", readyz, methods=["GET"]),
+    ]
+
+    if cfg.oauth_enabled:
+
+        async def well_known(request):
+            host = request.headers.get("host") or request.url.netloc
+            resource = f"{request.url.scheme}://{host}"
+            payload = {
+                "resource": resource,
+                "authorization_servers": [cfg.oauth_issuer],
+                "scopes_supported": ["openid", "email"],
+                "bearer_methods_supported": ["header"],
+            }
+            return JSONResponse(payload, headers={"Cache-Control": "no-store"})
+
+        routes.append(
+            Route("/.well-known/oauth-protected-resource", well_known, methods=["GET"])
+        )
+
+    return Starlette(routes=routes)
 
 
 class OpsDispatcher:
@@ -156,11 +177,12 @@ def build_http_app(cfg: HttpConfig | None = None):
     fastmcp = build_fastmcp(cfg)
     main_app = fastmcp.streamable_http_app()
     # Add from innermost to outermost (Starlette inserts at front), desired exec:
-    # Security -> Origin -> RequestId -> Timeout -> Accept -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
+    # Security -> Origin -> RequestId -> Timeout -> Accept -> Auth -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
     main_app.add_middleware(MessageHandlingMiddleware)
     main_app.add_middleware(MaxBodyMiddleware, cfg=cfg)
     main_app.add_middleware(RateLimitMiddleware, cfg=cfg)
     main_app.add_middleware(ContextMiddleware)
+    main_app.add_middleware(AuthMiddleware, cfg=cfg)
     main_app.add_middleware(AcceptMiddleware)
     main_app.add_middleware(TimeoutMiddleware, cfg=cfg)
     main_app.add_middleware(RequestIdMiddleware)
@@ -176,7 +198,7 @@ def build_http_app(cfg: HttpConfig | None = None):
     readiness_state = _compute_readiness_state()
     main_app.state.readiness = readiness_state
 
-    ops_app = _build_ops_app(readiness_state)
+    ops_app = _build_ops_app(readiness_state, cfg)
 
     return OpsDispatcher(ops_app, main_app)
 

@@ -127,6 +127,12 @@ class HttpConfig:
     rate_limit_ttl_windows: int = 3
     rate_limit_sse_rpm: int = 10
     rate_limit_hash_secret: str | None = None
+    # OAuth (optional, off by default)
+    oauth_enabled: bool = False
+    oauth_issuer: str = "accounts.google.com"
+    oauth_audience: str | None = None
+    oauth_jwks_url: str = "https://www.googleapis.com/oauth2/v3/certs"
+    oauth_jwks_cache_ttl: int = 3600
 
     @classmethod
     def from_env(cls) -> "HttpConfig":
@@ -203,6 +209,16 @@ class HttpConfig:
         rate_limit_sse_rpm = _read_int_env("MCP_RATE_LIMIT_SSE_RPM", 10)
         rate_limit_hash_secret = os.getenv("MCP_RATE_LIMIT_HASH_SECRET")
 
+        oauth_enabled = _get_bool_env("OAUTH_ENABLED", False)
+        oauth_issuer = os.getenv("OAUTH_ISSUER", cls.oauth_issuer)
+        oauth_audience = os.getenv("OAUTH_AUDIENCE", None)
+        oauth_jwks_url = os.getenv("OAUTH_JWKS_URL", cls.oauth_jwks_url)
+        oauth_jwks_cache_ttl = int(os.getenv("OAUTH_JWKS_CACHE_TTL", "3600") or 3600)
+        if oauth_enabled and not oauth_audience:
+            raise ValueError(
+                "OAUTH_AUDIENCE (Google OAuth client ID) must be set when OAUTH_ENABLED=true"  # noqa: E501
+            )
+
         rl_disable_allowed = rate_limit_allow_disable and env in {"dev", "local"}
         if not rl_disable_allowed:
             if rate_limit_rpm <= 0:
@@ -242,6 +258,11 @@ class HttpConfig:
             rate_limit_ttl_windows=rate_limit_ttl_windows,
             rate_limit_sse_rpm=rate_limit_sse_rpm,
             rate_limit_hash_secret=rate_limit_hash_secret,
+            oauth_enabled=oauth_enabled,
+            oauth_issuer=oauth_issuer,
+            oauth_audience=oauth_audience,
+            oauth_jwks_url=oauth_jwks_url,
+            oauth_jwks_cache_ttl=oauth_jwks_cache_ttl,
         )
 
 
