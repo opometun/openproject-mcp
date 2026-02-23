@@ -7,6 +7,9 @@ readme = "README.md"
 authors = [
     { name = "Oleksandr Pometun", email = "43117125+opometun@users.noreply.github.com" }
 ]
+ 
+[project.scripts]
+openproject-mcp = "openproject_mcp.cli:main"
 dependencies = [
     "mcp[cli]>=1.11.0,!=1.12.0,!=1.12.1",
     "httpx>=0.27.0",
