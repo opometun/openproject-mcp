@@ -265,6 +265,7 @@ async def test_bearer_without_token_falls_through(monkeypatch):
     """'Authorization: Bearer ' with no token should fall through to env."""
     monkeypatch.setenv("OPENPROJECT_BASE_URL", "http://example.com")
     monkeypatch.setenv("OPENPROJECT_API_KEY", "env-fallback")
+    monkeypatch.delenv("OAUTH_ENABLED", raising=False)
 
     cfg = HttpConfig(json_response=True, stateless_http=True)
     app = build_http_app(cfg)
