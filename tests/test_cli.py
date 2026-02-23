@@ -1,3 +1,5 @@
+import os
+
 from openproject_mcp import cli
 
 
@@ -29,3 +31,38 @@ def test_default_values_when_no_overrides():
     assert merged.host == cli.DEFAULT_HOST
     assert merged.port == cli.DEFAULT_PORT
     assert merged.log_level == cli.DEFAULT_LOG_LEVEL
+
+
+def test_cli_importable_without_http_extra(tmp_path):
+    """cli.py must be importable even when starlette/uvicorn are absent.
+
+    NOTE: As of mcp>=1.11, starlette and uvicorn are core transitive deps of
+    the ``mcp`` package, so this scenario cannot actually occur in practice.
+    We keep the test as a guard in case upstream changes.
+    """
+    # Verify the module-level import chain does NOT pull starlette eagerly.
+    # We can't truly hide starlette (mcp itself imports it), but we verify
+    # that cli.py itself does not import from the http transport at the top
+    # level — only in the 'http' command branch.
+    import ast
+
+    cli_path = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "src",
+        "openproject_mcp",
+        "cli.py",
+    )
+    with open(cli_path) as f:
+        tree = ast.parse(f.read())
+
+    top_level_imports: list[str] = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            top_level_imports.append(node.module)
+
+    # cli.py must NOT eagerly import the http transport at the top level
+    assert not any("transports.http" in m for m in top_level_imports), (
+        "cli.py has a top-level import from transports.http — "
+        "this would break a hypothetical base-only install"
+    )
