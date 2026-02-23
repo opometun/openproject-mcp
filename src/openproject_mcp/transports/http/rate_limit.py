@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from openproject_mcp.core.context import extract_api_key
 from openproject_mcp.transports.http.config import HttpConfig
 
 
@@ -151,7 +152,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         rid = getattr(request.state, "request_id", "")
         now = time.time()
-        api_key = request.headers.get("X-OpenProject-Key") or ""
+        api_key = extract_api_key(request.headers, fallback="") or ""
         allowed, remaining, retry_after = await self.limiter.check_and_increment(
             api_key, now
         )
@@ -227,7 +228,7 @@ class SSEHandshakeRateLimitMiddleware(BaseHTTPMiddleware):
 
         rid = getattr(request.state, "request_id", "")
         now = time.time()
-        api_key = request.headers.get("X-OpenProject-Key") or ""
+        api_key = extract_api_key(request.headers, fallback="") or ""
         allowed, remaining, retry_after = await self.limiter.check_and_increment(
             api_key, now
         )

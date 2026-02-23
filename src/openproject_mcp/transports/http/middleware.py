@@ -7,14 +7,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from openproject_mcp.core.config import load_env_config
 from openproject_mcp.core.context import (
     REQUEST_ID_HEADER,
     MissingApiKeyError,
     MissingBaseUrlError,
     apply_request_context,
+    extract_api_key,
     get_context,
     reset_context,
-    seed_from_env,
 )
 
 
@@ -22,16 +23,14 @@ class ContextMiddleware(BaseHTTPMiddleware):
     """Starlette middleware to seed and reset ContextVars per request."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Seed from env defaults (no dotenv for HTTP)
-        try:
-            env_ctx = seed_from_env(use_dotenv=False)
-        except Exception:
-            env_ctx = None
+        # Read env directly – never fails, just returns empty strings.
+        env_base_url, env_api_key = load_env_config(use_dotenv=False)
 
-        api_key = request.headers.get("X-OpenProject-Key") or (
-            env_ctx.api_key if env_ctx else None
+        api_key = extract_api_key(
+            request.headers,
+            fallback=env_api_key or None,
         )
-        base_url = env_ctx.base_url if env_ctx else None
+        base_url = env_base_url or None
         request_id = getattr(request.state, "request_id", None) or request.headers.get(
             REQUEST_ID_HEADER
         )

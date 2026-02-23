@@ -110,6 +110,8 @@ class HttpConfig:
     allowed_headers: Tuple[str, ...] = (
         "Content-Type",
         "Accept",
+        "Authorization",
+        "X-API-Key",
         "X-OpenProject-Key",
         "X-Request-Id",
         "X-OpenProject-BaseUrl",
