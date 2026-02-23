@@ -1,9 +1,10 @@
 import json
 
-import openproject_mcp.core.tools.metadata as metadata
 import pytest
 import respx
 from httpx import Response
+
+import openproject_mcp.core.tools.metadata as metadata
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.tools.work_packages import (
     add_comment,
@@ -435,14 +436,16 @@ async def test_search_content_client_fallback(client):
     # First call (with filters) returns 400 to trigger fallback; second call
     # (without filters) succeeds
     respx.get("https://mock-op.com/api/v3/work_packages").mock(
-        side_effect=lambda request: Response(400, json={"message": "Bad filter"})
-        if "filters" in request.url.params
-        else Response(
-            200,
-            json={
-                "_embedded": {"elements": [WP_SINGLE]},
-                "total": 1,
-            },
+        side_effect=lambda request: (
+            Response(400, json={"message": "Bad filter"})
+            if "filters" in request.url.params
+            else Response(
+                200,
+                json={
+                    "_embedded": {"elements": [WP_SINGLE]},
+                    "total": 1,
+                },
+            )
         )
     )
 

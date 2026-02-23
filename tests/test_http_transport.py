@@ -2,6 +2,7 @@ import importlib.metadata as md
 
 import httpx
 import pytest
+
 from openproject_mcp.transports.http import HttpConfig, build_http_app
 
 MCP_MIN_VERSION = "1.11.0"

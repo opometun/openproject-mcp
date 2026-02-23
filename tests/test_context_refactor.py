@@ -7,6 +7,7 @@ import anyio
 import httpx
 import pytest
 import respx
+
 from openproject_mcp.core import registry
 from openproject_mcp.core.context import (
     apply_request_context,

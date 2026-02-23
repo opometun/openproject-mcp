@@ -789,8 +789,7 @@ async def append_work_package_description(
                 method="PATCH",
                 url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
                 message=(
-                    "Work package was updated by someone else; "
-                    "please reload and retry."
+                    "Work package was updated by someone else; please reload and retry."
                 ),
             ) from exc
         raise

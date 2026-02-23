@@ -273,7 +273,7 @@ async def get_attachment_content(
 
     download_href, _ = await _attachment_download_url(client, attachment_id)
 
-    headers = {"Range": f"bytes=0-{max_bytes-1}"}
+    headers = {"Range": f"bytes=0-{max_bytes - 1}"}
     content: Optional[bytes] = None
     content_type: Optional[str] = None
 

@@ -3,17 +3,18 @@ import logging
 import httpx
 import pytest
 import respx
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.responses import JSONResponse
+from starlette.routing import Route
+from starlette.testclient import TestClient
+
 from openproject_mcp.core.client import (
     OpenProjectClient,
     OpenProjectClientError,
     RetryConfig,
 )
 from openproject_mcp.transports.http.request_id_middleware import RequestIdMiddleware
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
-from starlette.responses import JSONResponse
-from starlette.routing import Route
-from starlette.testclient import TestClient
 
 
 def _app(handler):
