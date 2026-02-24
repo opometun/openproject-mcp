@@ -57,3 +57,19 @@ Logging: stdio mode logs to stderr only; HTTP uses standard stderr logging (uvic
 - HTTP transport: `pip install "openproject-mcp[http]"`
 
 Dockerfile already installs the HTTP extra; local HTTP runs need the extra or you’ll see a friendly error telling you to install it.
+
+## OAuth scopes (when enabled)
+- Tools may declare required scopes via `@requires_scopes(...)`. These scopes are checked against the JWT `scope`/`scopes` claim.
+- API-key callers have no scopes; scope-gated tools will reject API-key requests. Use OAuth for those tools.
+- Issuer/audience/JWKS are configurable via `OAUTH_ISSUER`, `OAUTH_AUDIENCE`, `OAUTH_JWKS_URL` (CSV for multi-issuer); required global scopes via `OAUTH_REQUIRED_SCOPES` (CSV).
+
+### Per-tool scopes
+
+| Scope | Tools |
+|-------|-------|
+| `wp:write` | `create_work_package`, `update_status`, `update_work_package`, `append_work_package_description` |
+| `wp:comment` | `add_comment` |
+| `time:write` | `log_time` |
+| `attachment:write` | `attach_file_to_wp` |
+
+Read-only tools (`list_work_packages`, `get_work_package`, `list_projects`, etc.) require no scopes and work with any authenticated caller.

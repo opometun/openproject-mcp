@@ -20,6 +20,7 @@ from .context import (
     seed_from_env,
     seed_from_headers,
 )
+from .errors import ScopeDeniedError
 from .hal import (
     get_embedded,
     get_link,
@@ -32,6 +33,7 @@ from .registry import (
     discover_tool_modules,
     iter_tool_functions,
     register_discovered_tools,
+    requires_scopes,
 )
 
 __all__ = [
@@ -57,6 +59,9 @@ __all__ = [
     "discover_tool_modules",
     "iter_tool_functions",
     "register_discovered_tools",
+    "requires_scopes",
+    # Scope errors
+    "ScopeDeniedError",
     # Context
     "RequestContext",
     "MissingApiKeyError",

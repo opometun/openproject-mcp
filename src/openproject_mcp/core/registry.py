@@ -10,9 +10,21 @@ from typing import Callable, Iterable, List, Set, get_origin, get_type_hints
 
 from .client import OpenProjectClient
 from .context import current_request_id, ensure_request_id, get_context
+from .errors import ScopeDeniedError
 from .observability import log_event
 
 log = logging.getLogger("openproject_mcp.core.registry")
+REQUIRED_SCOPES_ATTR = "__required_scopes__"
+
+
+def requires_scopes(*scopes: str):
+    """Decorator to annotate tools with required OAuth scopes."""
+
+    def decorator(func):
+        setattr(func, REQUIRED_SCOPES_ATTR, tuple(scopes))
+        return func
+
+    return decorator
 
 
 # --- Discovery helpers ----------------------------------------------------- #
@@ -107,6 +119,8 @@ def _wrap_tool(
         except Exception:
             rid = ensure_request_id(current_request_id())
 
+        required_scopes = getattr(func, REQUIRED_SCOPES_ATTR, None)
+
         start = time.perf_counter()
         log_event(
             "tool_start",
@@ -115,6 +129,14 @@ def _wrap_tool(
         )
         status = "ok"
         try:
+            if required_scopes:
+                ctx = get_context(require_api_key=False, require_base_url=False)
+                granted = set(ctx.auth_scopes or ())
+                needed = set(required_scopes)
+                if not needed.issubset(granted):
+                    raise ScopeDeniedError(
+                        f"missing required scopes: {', '.join(sorted(needed - granted))}"  # noqa: E501
+                    )
             result = await func(client, *args, **kwargs)
             return result
         except Exception as exc:

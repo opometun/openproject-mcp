@@ -107,7 +107,7 @@ async def test_discovery_endpoint_present_when_enabled(monkeypatch):
             resp = await client.get("/.well-known/oauth-protected-resource")
             assert resp.status_code == 200
             data = resp.json()
-            assert data["authorization_servers"] == [cfg.oauth_issuer]
+            assert data["authorization_servers"] == list(cfg.oauth_issuer)
 
 
 @pytest.mark.asyncio

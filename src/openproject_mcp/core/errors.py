@@ -1,13 +1,5 @@
-from .client import (
-    OpenProjectClientError,
-    OpenProjectHTTPError,
-    OpenProjectModelValidationError,
-    OpenProjectParseError,
-)
+class ScopeDeniedError(PermissionError):
+    """Raised when a caller lacks required OAuth scopes for a tool."""
 
-__all__ = [
-    "OpenProjectClientError",
-    "OpenProjectHTTPError",
-    "OpenProjectParseError",
-    "OpenProjectModelValidationError",
-]
+
+__all__ = ["ScopeDeniedError"]
