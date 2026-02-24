@@ -39,7 +39,7 @@ class _JWKCache:
 
 
 async def _jwt_claims(
-    token: str, cfg: HttpConfig, jwk_cache: _JWKCache
+    token: str, cfg: HttpConfig, jwk_cache: _JWKCache, audience: str | None
 ) -> Dict[str, object]:
     header = jwt.get_unverified_header(token)
     kid = header.get("kid")
@@ -54,8 +54,8 @@ async def _jwt_claims(
         token,
         public_key,
         algorithms=[alg],
-        audience=cfg.oauth_audience,
-        issuer=cfg.oauth_issuer,
+        audience=audience,
+        issuer=None if len(cfg.oauth_issuer) > 1 else cfg.oauth_issuer[0],
     )
 
 
@@ -65,7 +65,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, cfg: HttpConfig):
         super().__init__(app)
         self.cfg = cfg
-        self._jwk_cache = _JWKCache(cfg.oauth_jwks_url, cfg.oauth_jwks_cache_ttl)
+        self._jwk_caches = {
+            issuer: _JWKCache(url, cfg.oauth_jwks_cache_ttl)
+            for issuer, url in zip(cfg.oauth_issuer, cfg.oauth_jwks_url, strict=False)
+        }
 
     async def dispatch(self, request: Request, call_next: Callable):
         # Allow discovery without auth
@@ -83,12 +86,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if bearer:
             if looks_jwt and self.cfg.oauth_enabled:
                 try:
-                    claims = await _jwt_claims(bearer, self.cfg, self._jwk_cache)
+                    claims = await self._validate_jwt(bearer)
                     request.state.auth_principal = (
                         claims.get("iss"),
                         claims.get("sub"),
                     )
                     request.state.oauth_claims = claims
+                    scopes_val = claims.get("scope") or claims.get("scopes") or ""
+                    request.state.oauth_scopes = tuple(
+                        s for s in scopes_val.split() if s.strip()
+                    )
                     return await call_next(request)
                 except Exception:
                     return self._unauthorized(request, bearer_challenge=True)
@@ -127,6 +134,31 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return None
         token = auth.split(" ", 1)[1].strip()
         return token or None
+
+    async def _validate_jwt(self, token: str) -> Dict[str, object]:
+        # Try each issuer; audience can be single (applied to all) or per-issuer
+        for idx, issuer in enumerate(self.cfg.oauth_issuer):
+            jwk_cache = self._jwk_caches[issuer]
+            audience = (
+                self.cfg.oauth_audience[idx]
+                if self.cfg.oauth_audience and len(self.cfg.oauth_audience) > 1
+                else (self.cfg.oauth_audience[0] if self.cfg.oauth_audience else None)
+            )
+            try:
+                claims = await _jwt_claims(token, self.cfg, jwk_cache, audience)
+                if claims.get("iss") == issuer:
+                    # Scope check if required
+                    if self.cfg.oauth_required_scopes:
+                        token_scopes = set(
+                            (claims.get("scope") or claims.get("scopes") or "").split()
+                        )
+                        required = set(self.cfg.oauth_required_scopes)
+                        if not required.issubset(token_scopes):
+                            raise InvalidTokenError("missing required scopes")
+                    return claims
+            except InvalidTokenError:
+                continue
+        raise InvalidTokenError("No matching issuer/audience for token")
 
     def _unauthorized(self, request: Request, bearer_challenge: bool) -> Response:
         rid = getattr(request.state, "request_id", "") or ""

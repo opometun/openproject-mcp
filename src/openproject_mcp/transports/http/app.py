@@ -137,10 +137,21 @@ def _build_ops_app(readiness_state: Dict[str, bool], cfg: HttpConfig) -> Starlet
         async def well_known(request):
             host = request.headers.get("host") or request.url.netloc
             resource = f"{request.url.scheme}://{host}"
+            # Compute supported scopes: config-required + known tool scopes
+            scopes = sorted(
+                set(cfg.oauth_required_scopes)
+                | {
+                    "wp:read",
+                    "wp:write",
+                    "wp:comment",
+                    "time:write",
+                    "attachment:write",
+                }
+            )
             payload = {
                 "resource": resource,
-                "authorization_servers": [cfg.oauth_issuer],
-                "scopes_supported": ["openid", "email"],
+                "authorization_servers": list(cfg.oauth_issuer),
+                "scopes_supported": scopes,
                 "bearer_methods_supported": ["header"],
             }
             return JSONResponse(payload, headers={"Cache-Control": "no-store"})

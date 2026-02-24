@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.hal import parse_id_from_href
+from openproject_mcp.core.registry import requires_scopes
 from openproject_mcp.core.tools._collections import embedded_elements
 from openproject_mcp.core.tools.metadata import (
     NotFoundResolutionError,
@@ -19,16 +20,34 @@ from openproject_mcp.core.utils.time_parser import (
 )
 
 
+@requires_scopes("time:write")
 async def log_time(
     client: OpenProjectClient,
     work_package_id: int,
-    duration: str,
+    duration: Optional[str] = None,
     comment: str = "",
     activity_id: int = 1,
     spent_on: Optional[date] = None,
+    started_at: Optional[str] = None,
+    ended_at: Optional[str] = None,
 ) -> str:
     """
     Log time on a work package.
+
+    Time can be specified in two ways:
+    1. **Duration string**: e.g. "2h", "30m", "2h 30m"
+    2. **Start/end times**: e.g. started_at="09:00", ended_at="11:30"
+       (calculates duration automatically)
+
+    When using start/end times:
+    - Accepts "HH:MM", "HH:MM:SS", or full ISO datetime strings.
+    - If only times are given (no date part), ``spent_on`` is used (defaults to today).
+    - If full datetimes are given, ``spent_on`` is inferred from ``started_at``.
+    - ``ended_at`` must be after ``started_at``; overnight spans are supported
+      when full datetimes are used.
+
+    You must provide **either** ``duration`` **or** both ``started_at`` and ``ended_at``,
+    but not both.
 
     Args:
         work_package_id: Target work package ID.
@@ -36,17 +55,70 @@ async def log_time(
         comment: Optional comment.
         activity_id: Activity to assign; Stage 1 assumes caller provides a valid ID.
         spent_on: Date; defaults to today.
+        started_at: Start time, e.g. "09:00" or "2024-01-15T09:00:00".
+        ended_at: End time, e.g. "11:30" or "2024-01-15T11:30:00".
 
     Returns:
-        Success message with work package id and original duration string.
-    """
-    try:
-        iso_duration = parse_duration_string(duration)
-    except DurationParseError as exc:
+        Success message with work package id and logged duration.
+    """  # noqa: E501
+    # --- Validate input mode ---
+    has_duration = duration is not None
+    has_range = started_at is not None or ended_at is not None
+
+    if has_duration and has_range:
         return (
-            f"Error: {exc} Accepted examples: '2h', '30m', '2h 30m'. "
-            "Use hours (h) and minutes (m)."
+            "Error: provide either 'duration' OR both 'started_at'/'ended_at', "
+            "not both."
         )
+    if not has_duration and not has_range:
+        return (
+            "Error: provide either 'duration' (e.g. '2h 30m') or both "
+            "'started_at' and 'ended_at' (e.g. '09:00' and '11:30')."
+        )
+    if has_range and (started_at is None or ended_at is None):
+        return "Error: both 'started_at' and 'ended_at' are required when using time range."  # noqa: E501
+
+    # --- Resolve duration ---
+    if has_duration:
+        try:
+            iso_duration = parse_duration_string(duration)
+        except DurationParseError as exc:
+            return (
+                f"Error: {exc} Accepted examples: '2h', '30m', '2h 30m'. "
+                "Use hours (h) and minutes (m)."
+            )
+        display_duration = duration
+    else:
+        # Parse start/end and compute duration
+        try:
+            start_dt, end_dt, inferred_date = _parse_time_range(
+                started_at, ended_at, spent_on
+            )
+        except ValueError as exc:
+            return f"Error: {exc}"
+        if inferred_date is not None:
+            spent_on = inferred_date
+        diff = end_dt - start_dt
+        total_seconds = int(diff.total_seconds())
+        if total_seconds <= 0:
+            return "Error: 'ended_at' must be after 'started_at'."
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        parts = ["PT"]
+        if hours:
+            parts.append(f"{hours}H")
+        if minutes:
+            parts.append(f"{minutes}M")
+        if len(parts) == 1:
+            parts.append("1M")  # less than a minute → round up to 1m
+        iso_duration = "".join(parts)
+        display_duration = f"{started_at} – {ended_at}"
+        if hours and minutes:
+            display_duration += f" ({hours}h {minutes}m)"
+        elif hours:
+            display_duration += f" ({hours}h)"
+        elif minutes:
+            display_duration += f" ({minutes}m)"
 
     spent_on_value = (spent_on or date.today()).isoformat()
 
@@ -61,7 +133,48 @@ async def log_time(
     }
 
     await client.post("/api/v3/time_entries", json=payload, tool="time_entries")
-    return f"Logged {duration} to work package {work_package_id} on {spent_on_value}."
+    return f"Logged {display_duration} to work package {work_package_id} on {spent_on_value}."  # noqa: E501
+
+
+def _parse_time_range(
+    started_at: str,
+    ended_at: str,
+    spent_on: Optional[date],
+) -> tuple[datetime, datetime, Optional[date]]:
+    """Parse started_at/ended_at into datetimes.
+
+    Returns (start_datetime, end_datetime, inferred_date_or_None).
+    """
+    start_dt = _parse_flexible_time(started_at, spent_on)
+    end_dt = _parse_flexible_time(ended_at, spent_on)
+    # Infer spent_on from start datetime when not explicitly provided
+    inferred_date = start_dt.date() if spent_on is None else None
+    return start_dt, end_dt, inferred_date
+
+
+_TIME_ONLY_RE = re.compile(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$")
+
+
+def _parse_flexible_time(value: str, reference_date: Optional[date]) -> datetime:
+    """Parse a time-only string ("HH:MM" / "HH:MM:SS") or full ISO datetime."""
+    value = value.strip()
+    m = _TIME_ONLY_RE.match(value)
+    if m:
+        h, mi, s = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+        if not (0 <= h <= 23 and 0 <= mi <= 59 and 0 <= s <= 59):
+            raise ValueError(
+                f"Invalid time '{value}': hours 0-23, minutes/seconds 0-59."
+            )
+        ref = reference_date or date.today()
+        return datetime(ref.year, ref.month, ref.day, h, mi, s)
+    # Try ISO datetime
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        raise ValueError(  # noqa: B904
+            f"Cannot parse '{value}' as a time. "
+            "Use 'HH:MM', 'HH:MM:SS', or an ISO datetime like '2024-01-15T09:00:00'."
+        )
 
 
 def _parse_iso_duration_to_minutes(iso: str) -> Optional[int]:

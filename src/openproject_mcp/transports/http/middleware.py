@@ -74,6 +74,8 @@ class ContextMiddleware(BaseHTTPMiddleware):
                     base_url=resolved_base_url or "",
                     request_id=request_id,
                     user_agent=user_agent,
+                    auth_principal=principal,
+                    auth_scopes=getattr(request.state, "oauth_scopes", ()),
                 )
             )
             context = get_context(require_api_key=True, require_base_url=True)

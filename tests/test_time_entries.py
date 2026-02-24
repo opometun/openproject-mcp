@@ -100,7 +100,196 @@ async def test_log_time_404_propagates(client):
             await log_time(client, work_package_id=123, duration="2h")
 
 
-# --- list_time_entries tests ---
+# --- log_time with start/end times ---
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_log_time_with_start_end_times(client):
+    """Start/end times should compute duration and post correctly."""
+    route = respx.post("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(201, json={"_type": "TimeEntry"})
+    )
+
+    fixed_date = date(2024, 3, 15)
+
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=42,
+            started_at="09:00",
+            ended_at="11:30",
+            comment="Morning session",
+            spent_on=fixed_date,
+        )
+
+    req = route.calls[0].request
+    body = json.loads(req.content)
+
+    assert body["hours"] == "PT2H30M"
+    assert body["spentOn"] == "2024-03-15"
+    assert body["comment"]["raw"] == "Morning session"
+    assert "09:00" in msg and "11:30" in msg
+    assert "2h 30m" in msg
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_log_time_start_end_full_hours(client):
+    """Exact-hour spans should produce clean duration."""
+    route = respx.post("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(201, json={"_type": "TimeEntry"})
+    )
+
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+            started_at="14:00",
+            ended_at="17:00",
+            spent_on=date(2024, 6, 1),
+        )
+
+    body = json.loads(route.calls[0].request.content)
+    assert body["hours"] == "PT3H"
+    assert "3h" in msg
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_log_time_start_end_minutes_only(client):
+    """Short spans under an hour."""
+    route = respx.post("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(201, json={"_type": "TimeEntry"})
+    )
+
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+            started_at="09:00",
+            ended_at="09:45",
+            spent_on=date(2024, 6, 1),
+        )
+
+    body = json.loads(route.calls[0].request.content)
+    assert body["hours"] == "PT45M"
+    assert "45m" in msg
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_log_time_start_end_with_seconds(client):
+    """HH:MM:SS format should be accepted."""
+    route = respx.post("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(201, json={"_type": "TimeEntry"})
+    )
+
+    async with client:
+        await log_time(
+            client,
+            work_package_id=10,
+            started_at="09:00:00",
+            ended_at="10:30:00",
+            spent_on=date(2024, 6, 1),
+        )
+
+    body = json.loads(route.calls[0].request.content)
+    assert body["hours"] == "PT1H30M"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_log_time_start_end_iso_datetime(client):
+    """Full ISO datetime strings should work and infer spent_on."""
+    route = respx.post("https://mock-op.com/api/v3/time_entries").mock(
+        return_value=Response(201, json={"_type": "TimeEntry"})
+    )
+
+    async with client:
+        await log_time(
+            client,
+            work_package_id=10,
+            started_at="2024-07-20T08:00:00",
+            ended_at="2024-07-20T12:15:00",
+        )
+
+    body = json.loads(route.calls[0].request.content)
+    assert body["hours"] == "PT4H15M"
+    assert body["spentOn"] == "2024-07-20"
+
+
+@pytest.mark.asyncio
+async def test_log_time_end_before_start_returns_error(client):
+    """ended_at before started_at should return a friendly error."""
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+            started_at="11:00",
+            ended_at="09:00",
+            spent_on=date(2024, 6, 1),
+        )
+
+    assert "Error" in msg
+    assert "after" in msg
+
+
+@pytest.mark.asyncio
+async def test_log_time_both_duration_and_range_returns_error(client):
+    """Cannot provide both duration and start/end."""
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+            duration="2h",
+            started_at="09:00",
+            ended_at="11:00",
+        )
+
+    assert "Error" in msg
+
+
+@pytest.mark.asyncio
+async def test_log_time_neither_duration_nor_range_returns_error(client):
+    """Must provide at least one time specification."""
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+        )
+
+    assert "Error" in msg
+
+
+@pytest.mark.asyncio
+async def test_log_time_only_started_at_returns_error(client):
+    """Providing only started_at (without ended_at) should error."""
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+            started_at="09:00",
+        )
+
+    assert "Error" in msg
+    assert "ended_at" in msg
+
+
+@pytest.mark.asyncio
+async def test_log_time_invalid_time_format_returns_error(client):
+    """Invalid time strings should return a friendly error."""
+    async with client:
+        msg = await log_time(
+            client,
+            work_package_id=10,
+            started_at="nine o'clock",
+            ended_at="11:00",
+            spent_on=date(2024, 6, 1),
+        )
+
+    assert "Error" in msg
+    assert "Cannot parse" in msg
 
 
 @pytest.mark.asyncio
