@@ -133,6 +133,8 @@ class HttpConfig:
     oauth_audience: str | None = None
     oauth_jwks_url: str = "https://www.googleapis.com/oauth2/v3/certs"
     oauth_jwks_cache_ttl: int = 3600
+    token_store_backend: str = "memory"  # memory|firestore
+    token_enc_key: str | None = None
 
     @classmethod
     def from_env(cls) -> "HttpConfig":
@@ -214,10 +216,14 @@ class HttpConfig:
         oauth_audience = os.getenv("OAUTH_AUDIENCE", None)
         oauth_jwks_url = os.getenv("OAUTH_JWKS_URL", cls.oauth_jwks_url)
         oauth_jwks_cache_ttl = int(os.getenv("OAUTH_JWKS_CACHE_TTL", "3600") or 3600)
+        token_store_backend = os.getenv("OAUTH_TOKEN_STORE", "memory").lower()
+        token_enc_key = os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY")
         if oauth_enabled and not oauth_audience:
             raise ValueError(
                 "OAUTH_AUDIENCE (Google OAuth client ID) must be set when OAUTH_ENABLED=true"  # noqa: E501
             )
+        if token_store_backend not in {"memory", "firestore"}:
+            raise ValueError("OAUTH_TOKEN_STORE must be 'memory' or 'firestore'")
 
         rl_disable_allowed = rate_limit_allow_disable and env in {"dev", "local"}
         if not rl_disable_allowed:
@@ -263,6 +269,8 @@ class HttpConfig:
             oauth_audience=oauth_audience,
             oauth_jwks_url=oauth_jwks_url,
             oauth_jwks_cache_ttl=oauth_jwks_cache_ttl,
+            token_store_backend=token_store_backend,
+            token_enc_key=token_enc_key,
         )
 
 

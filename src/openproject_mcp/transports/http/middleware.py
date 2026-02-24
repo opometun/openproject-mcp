@@ -17,12 +17,18 @@ from openproject_mcp.core.context import (
     get_context,
     reset_context,
 )
+from openproject_mcp.transports.http.errors import TokenNotLinkedError
+from openproject_mcp.transports.http.op_token_provider import OpenProjectTokenProvider
 
 
 class ContextMiddleware(BaseHTTPMiddleware):
     """Starlette middleware to seed and reset ContextVars per request."""
 
     async def dispatch(self, request: Request, call_next: Callable):
+        # Allow link/unlink to bypass token resolution
+        if request.url.path in {"/link/openproject", "/unlink/openproject"}:
+            return await call_next(request)
+
         # Read env directly – never fails, just returns empty strings.
         env_base_url, env_api_key = load_env_config(use_dotenv=False)
 
@@ -30,7 +36,7 @@ class ContextMiddleware(BaseHTTPMiddleware):
             request.headers,
             fallback=env_api_key or None,
         )
-        base_url = env_base_url or None
+
         request_id = getattr(request.state, "request_id", None) or request.headers.get(
             REQUEST_ID_HEADER
         )
@@ -42,11 +48,30 @@ class ContextMiddleware(BaseHTTPMiddleware):
         if not ctx_request_id:
             ctx_request_id = request.headers.get(REQUEST_ID_HEADER) or ""
 
+        tokens = None
         try:
+            # Resolve token: prefer linked token for principal, else header/env
+            principal = getattr(request.state, "auth_principal", None)
+            store = getattr(request.app.state, "token_store", None)
+            if store is None:
+                # Fallback for legacy setups/tests that don't inject a store
+                from openproject_mcp.transports.http.token_store import MemoryTokenStore
+
+                store = MemoryTokenStore(enc_key=None)
+                request.app.state.token_store = store
+
+            provider = OpenProjectTokenProvider(
+                store=store,
+                env_api_key=env_api_key or None,
+                env_base_url=env_base_url or None,
+            )
+            resolved_api_key, resolved_base_url = provider.resolve(
+                principal, api_key or None
+            )
             tokens = list(
                 apply_request_context(
-                    api_key=api_key or "",
-                    base_url=base_url or "",
+                    api_key=resolved_api_key or "",
+                    base_url=resolved_base_url or "",
                     request_id=request_id,
                     user_agent=user_agent,
                 )
@@ -55,15 +80,6 @@ class ContextMiddleware(BaseHTTPMiddleware):
             response: Response = await call_next(request)
             response.headers[REQUEST_ID_HEADER] = context.request_id
             return response
-        except MissingApiKeyError as exc:
-            return self._error_response(
-                status=401,
-                code="missing_api_key",
-                message=str(exc),
-                request_id=ctx_request_id
-                or request.headers.get(REQUEST_ID_HEADER)
-                or "",
-            )
         except MissingBaseUrlError as exc:
             return self._error_response(
                 status=500,
@@ -73,8 +89,27 @@ class ContextMiddleware(BaseHTTPMiddleware):
                 or request.headers.get(REQUEST_ID_HEADER)
                 or "",
             )
+        except MissingApiKeyError as exc:
+            return self._error_response(
+                status=401,
+                code="missing_api_key",
+                message=str(exc),
+                request_id=ctx_request_id
+                or request.headers.get(REQUEST_ID_HEADER)
+                or "",
+            )
+        except TokenNotLinkedError as exc:
+            return self._error_response(
+                status=401,
+                code="missing_api_key",
+                message=str(exc),
+                request_id=ctx_request_id
+                or request.headers.get(REQUEST_ID_HEADER)
+                or "",
+            )
         finally:
-            reset_context(tokens)
+            if tokens is not None:
+                reset_context(tokens)
 
     @staticmethod
     def _error_response(

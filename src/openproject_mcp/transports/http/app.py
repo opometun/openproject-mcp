@@ -16,6 +16,7 @@ from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
 from openproject_mcp.transports.http.auth_middleware import AuthMiddleware
 from openproject_mcp.transports.http.config import HttpConfig
+from openproject_mcp.transports.http.link_handlers import link_routes
 from openproject_mcp.transports.http.max_body_middleware import MaxBodyMiddleware
 from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
 from openproject_mcp.transports.http.middleware import ContextMiddleware
@@ -33,6 +34,7 @@ from openproject_mcp.transports.http.security_headers_middleware import (
     SecurityHeadersMiddleware,
 )
 from openproject_mcp.transports.http.timeout_middleware import TimeoutMiddleware
+from openproject_mcp.transports.http.token_store import MemoryTokenStore
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +130,8 @@ def _build_ops_app(readiness_state: Dict[str, bool], cfg: HttpConfig) -> Starlet
         Route("/readyz", readyz, methods=["GET"]),
     ]
 
+    # link/unlink should go through main_app middleware; we no longer attach them here
+
     if cfg.oauth_enabled:
 
         async def well_known(request):
@@ -174,8 +178,17 @@ class OpsDispatcher:
 def build_http_app(cfg: HttpConfig | None = None):
     """Return an ASGI app that dispatches ops endpoints before the main FastMCP app."""
     cfg = cfg or HttpConfig.from_env()
+    if cfg.token_store_backend == "firestore":
+        raise RuntimeError(
+            "Firestore token store not yet implemented; use memory for now."
+        )
+    token_store = MemoryTokenStore(enc_key=cfg.token_enc_key)
     fastmcp = build_fastmcp(cfg)
     main_app = fastmcp.streamable_http_app()
+    main_app.state.token_store = token_store
+    link_map = link_routes(token_store)
+    for path, handler in link_map.items():
+        main_app.router.add_route(path, handler, methods=["POST"])
     # Add from innermost to outermost (Starlette inserts at front), desired exec:
     # Security -> Origin -> RequestId -> Timeout -> Accept -> Auth -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
     main_app.add_middleware(MessageHandlingMiddleware)
