@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
+import os
 import pkgutil
 import time
 from types import ModuleType
@@ -15,6 +16,20 @@ from .observability import log_event
 
 log = logging.getLogger("openproject_mcp.core.registry")
 REQUIRED_SCOPES_ATTR = "__required_scopes__"
+
+
+def _api_key_scopes() -> tuple[str, ...]:
+    """Scopes to grant API-key callers when OAuth scopes are absent.
+
+    Controlled via API_KEY_SCOPES env var (CSV). Default: none, so API-key
+    callers stay read-only unless explicitly configured. This lets operators
+    align granted scopes with the actual rights of their OpenProject API keys
+    (some keys may be read-only, others may allow writes).
+    """
+
+    raw = os.getenv("API_KEY_SCOPES", "")
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return tuple(parts)
 
 
 def requires_scopes(*scopes: str):
@@ -132,6 +147,11 @@ def _wrap_tool(
             if required_scopes:
                 ctx = get_context(require_api_key=False, require_base_url=False)
                 granted = set(ctx.auth_scopes or ())
+                # If OAuth scopes are missing (API-key caller), optionally grant
+                # operator-configured scopes from API_KEY_SCOPES so write tools can
+                # align with the caller's OpenProject API token capabilities.
+                if not granted:
+                    granted = set(_api_key_scopes())
                 needed = set(required_scopes)
                 if not needed.issubset(granted):
                     raise ScopeDeniedError(
