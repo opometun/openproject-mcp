@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from openproject_mcp.transports.http.config import HttpConfig
+from openproject_mcp.transports.http.token_store import principal_from_api_key
 
 
 def _looks_like_jwt(token: str) -> bool:
@@ -24,15 +25,15 @@ class _JWKCache:
         self.url = url
         self.ttl = ttl
         self._cached: Tuple[float, Dict[str, object]] | None = None
-        self._client = httpx.AsyncClient()
 
     async def get(self) -> Dict[str, object]:
         now = time.time()
         if self._cached and now - self._cached[0] < self.ttl:
             return self._cached[1]
-        resp = await self._client.get(self.url, timeout=5.0)
-        resp.raise_for_status()
-        data = resp.json()
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(self.url, timeout=5.0)
+            resp.raise_for_status()
+            data = resp.json()
         self._cached = (now, data)
         return data
 
@@ -59,7 +60,7 @@ async def _jwt_claims(
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """Dual auth: OAuth JWT (Google) OR API key. No breaking change for API keys."""
+    """Dual auth: OAuth JWT (Google) OR API key. Set auth_principal for link lookups."""
 
     def __init__(self, app, cfg: HttpConfig):
         super().__init__(app)
@@ -93,7 +94,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     return self._unauthorized(request, bearer_challenge=True)
             # OAuth disabled OR non-JWT → treat as API key and fall through
             if bearer:
-                # Mark for downstream context extraction; ContextMiddleware will read headers again  # noqa: E501
+                request.state.auth_principal = principal_from_api_key(bearer)
                 return await call_next(request)
 
         # 2) API key headers
@@ -102,6 +103,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
             or headers.get("x-openproject-key")
             or headers.get("X-API-Key")
         ):
+            key = (
+                headers.get("X-OpenProject-Key")
+                or headers.get("x-openproject-key")
+                or headers.get("X-API-Key")
+            )
+            if key:
+                request.state.auth_principal = principal_from_api_key(key)
             return await call_next(request)
 
         # 3) No auth provided
