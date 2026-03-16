@@ -1,5 +1,6 @@
 import httpx
 import pytest
+
 from openproject_mcp.transports.http import HttpConfig, build_http_app
 
 
@@ -76,6 +77,7 @@ async def test_required_scopes_missing_returns_401(monkeypatch):
     app = build_http_app(cfg)
     async with app.router.lifespan_context(app):
         from jwt import InvalidTokenError
+
         from openproject_mcp.transports.http import auth_middleware
 
         async def fake_validate(self, token):
@@ -235,9 +237,9 @@ def test_write_tools_are_annotated():
         func = getattr(module, func_name)
         scopes = getattr(func, REQUIRED_SCOPES_ATTR, None)
         assert scopes is not None, f"{func_name} missing @requires_scopes"
-        assert (
-            expected_scope in scopes
-        ), f"{func_name}: expected scope '{expected_scope}' in {scopes}"
+        assert expected_scope in scopes, (
+            f"{func_name}: expected scope '{expected_scope}' in {scopes}"
+        )
 
 
 def test_read_tools_are_not_annotated():
@@ -256,6 +258,6 @@ def test_read_tools_are_not_annotated():
     ]
     for module, func_name in read_funcs:
         func = getattr(module, func_name)
-        assert not hasattr(
-            func, REQUIRED_SCOPES_ATTR
-        ), f"Read tool {func_name} should not have @requires_scopes"
+        assert not hasattr(func, REQUIRED_SCOPES_ATTR), (
+            f"Read tool {func_name} should not have @requires_scopes"
+        )

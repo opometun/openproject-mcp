@@ -1,6 +1,7 @@
+from starlette.testclient import TestClient
+
 from openproject_mcp.transports.http.app import build_http_app
 from openproject_mcp.transports.http.config import HttpConfig
-from starlette.testclient import TestClient
 
 
 def _build_app(cfg: HttpConfig | None = None):

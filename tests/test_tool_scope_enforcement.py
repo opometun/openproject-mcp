@@ -1,4 +1,5 @@
 import pytest
+
 from openproject_mcp.core.context import apply_request_context, reset_context
 from openproject_mcp.core.errors import ScopeDeniedError
 from openproject_mcp.core.registry import (

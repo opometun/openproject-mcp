@@ -1,4 +1,5 @@
 import pytest
+
 from openproject_mcp.transports.http.errors import TokenNotLinkedError
 from openproject_mcp.transports.http.op_token_provider import OpenProjectTokenProvider
 from openproject_mcp.transports.http.token_crypto import decrypt_token, encrypt_token

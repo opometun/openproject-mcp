@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 import pytest
+
 from openproject_mcp.transports.http import HttpConfig, build_http_app
 from openproject_mcp.transports.http.rate_limit import time as rl_time
 

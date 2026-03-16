@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
+
 from openproject_mcp.transports.http.app import build_http_app
 from openproject_mcp.transports.http.config import HttpConfig
 
