@@ -14,9 +14,7 @@ from openproject_mcp.core.config import load_env_config
 from openproject_mcp.core.context import client_from_context
 from openproject_mcp.core.registry import register_discovered_tools
 from openproject_mcp.transports.http.accept_middleware import AcceptMiddleware
-from openproject_mcp.transports.http.auth_middleware import AuthMiddleware
 from openproject_mcp.transports.http.config import HttpConfig
-from openproject_mcp.transports.http.link_handlers import link_routes
 from openproject_mcp.transports.http.max_body_middleware import MaxBodyMiddleware
 from openproject_mcp.transports.http.message_middleware import MessageHandlingMiddleware
 from openproject_mcp.transports.http.middleware import ContextMiddleware
@@ -34,7 +32,6 @@ from openproject_mcp.transports.http.security_headers_middleware import (
     SecurityHeadersMiddleware,
 )
 from openproject_mcp.transports.http.timeout_middleware import TimeoutMiddleware
-from openproject_mcp.transports.http.token_store import MemoryTokenStore
 
 log = logging.getLogger(__name__)
 
@@ -98,17 +95,13 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
 
 
 def _compute_readiness_state() -> Dict[str, bool]:
-    base_url, api_key = load_env_config(use_dotenv=False)
-
-    # API key can be overridden per request; base_url currently not
-    header_override_supported = True
+    base_url, _api_key = load_env_config(use_dotenv=False)
 
     return {
         "config_loaded": True,
         "limiter_config_valid": True,
         "default_base_url_present": bool(base_url),
-        "default_api_key_present": bool(api_key),
-        "header_override_supported": header_override_supported,
+        "per_request_api_key_supported": True,
     }
 
 
@@ -129,36 +122,6 @@ def _build_ops_app(readiness_state: Dict[str, bool], cfg: HttpConfig) -> Starlet
         Route("/healthz", healthz, methods=["GET"]),
         Route("/readyz", readyz, methods=["GET"]),
     ]
-
-    # link/unlink should go through main_app middleware; we no longer attach them here
-
-    if cfg.oauth_enabled:
-
-        async def well_known(request):
-            host = request.headers.get("host") or request.url.netloc
-            resource = f"{request.url.scheme}://{host}"
-            # Compute supported scopes: config-required + known tool scopes
-            scopes = sorted(
-                set(cfg.oauth_required_scopes)
-                | {
-                    "wp:read",
-                    "wp:write",
-                    "wp:comment",
-                    "time:write",
-                    "attachment:write",
-                }
-            )
-            payload = {
-                "resource": resource,
-                "authorization_servers": list(cfg.oauth_issuer),
-                "scopes_supported": scopes,
-                "bearer_methods_supported": ["header"],
-            }
-            return JSONResponse(payload, headers={"Cache-Control": "no-store"})
-
-        routes.append(
-            Route("/.well-known/oauth-protected-resource", well_known, methods=["GET"])
-        )
 
     return Starlette(routes=routes)
 
@@ -189,24 +152,14 @@ class OpsDispatcher:
 def build_http_app(cfg: HttpConfig | None = None):
     """Return an ASGI app that dispatches ops endpoints before the main FastMCP app."""
     cfg = cfg or HttpConfig.from_env()
-    if cfg.token_store_backend == "firestore":
-        raise RuntimeError(
-            "Firestore token store not yet implemented; use memory for now."
-        )
-    token_store = MemoryTokenStore(enc_key=cfg.token_enc_key)
     fastmcp = build_fastmcp(cfg)
     main_app = fastmcp.streamable_http_app()
-    main_app.state.token_store = token_store
-    link_map = link_routes(token_store)
-    for path, handler in link_map.items():
-        main_app.router.add_route(path, handler, methods=["POST"])
     # Add from innermost to outermost (Starlette inserts at front), desired exec:
-    # Security -> Origin -> RequestId -> Timeout -> Accept -> Auth -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
+    # Security -> Origin -> RequestId -> Timeout -> Accept -> Context -> RateLimit -> MaxBody -> Message -> app  # noqa: E501
     main_app.add_middleware(MessageHandlingMiddleware)
     main_app.add_middleware(MaxBodyMiddleware, cfg=cfg)
     main_app.add_middleware(RateLimitMiddleware, cfg=cfg)
     main_app.add_middleware(ContextMiddleware)
-    main_app.add_middleware(AuthMiddleware, cfg=cfg)
     main_app.add_middleware(AcceptMiddleware)
     main_app.add_middleware(TimeoutMiddleware, cfg=cfg)
     main_app.add_middleware(RequestIdMiddleware)

@@ -500,8 +500,6 @@ dependencies = [
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
     { name = "python-dotenv" },
-    { name = "starlette" },
-    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -513,11 +511,15 @@ dev = [
     { name = "respx" },
     { name = "ruff" },
 ]
+http = [
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.11.0,!=1.12.0,!=1.12.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -526,10 +528,10 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.20.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
-    { name = "starlette", specifier = ">=0.30.0" },
-    { name = "uvicorn", specifier = ">=0.20.0" },
+    { name = "starlette", marker = "extra == 'http'", specifier = ">=0.30.0" },
+    { name = "uvicorn", marker = "extra == 'http'", specifier = ">=0.20.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "http"]
 
 [[package]]
 name = "packaging"

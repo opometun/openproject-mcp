@@ -5,7 +5,6 @@ from typing import Dict
 OPS_PATHS = {
     "/healthz",
     "/readyz",
-    "/.well-known/oauth-protected-resource",
 }
 
 

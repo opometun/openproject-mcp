@@ -45,7 +45,6 @@ async def run_smoke_test() -> int:
     cfg_project_identifier = _env("TEST_PROJECT_IDENTIFIER")
     cfg_type = _env("TEST_WP_TYPE")
     cfg_status = _env("TEST_TARGET_STATUS")
-    cleanup = _env("SMOKE_TEST_CLEANUP", "0") == "1"
 
     print("Config:")
     print(f"  base_url: {base_url}")
@@ -53,7 +52,6 @@ async def run_smoke_test() -> int:
     print(f"  project_identifier: {cfg_project_identifier}")
     print(f"  type: {cfg_type}")
     print(f"  target_status: {cfg_status}")
-    print(f"  cleanup: {cleanup}")
 
     client = OpenProjectClient(base_url=base_url, api_key=api_key)
 
@@ -185,17 +183,11 @@ async def run_smoke_test() -> int:
             )
         print("Verification OK")
 
-        # --- Cleanup (optional) ---
+        # --- Cleanup ---
         _print_step("Cleanup")
-        if cleanup:
-            print(
-                "Cleanup requested: no delete API implemented; "
-                "leaving work package in place."
-            )
-        else:
-            print(
-                "Cleanup skipped (SMOKE_TEST_CLEANUP=0). Work package left in system."
-            )
+        print(
+            "Delete/archive lifecycle is not implemented; work package left in system."
+        )
 
     print("\nPASSED smoke test.")
     return 0

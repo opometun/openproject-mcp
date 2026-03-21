@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
-import os
 import pkgutil
 import time
 from types import ModuleType
@@ -11,35 +10,9 @@ from typing import Callable, Iterable, List, Set, get_origin, get_type_hints
 
 from .client import OpenProjectClient
 from .context import current_request_id, ensure_request_id, get_context
-from .errors import ScopeDeniedError
 from .observability import log_event
 
 log = logging.getLogger("openproject_mcp.core.registry")
-REQUIRED_SCOPES_ATTR = "__required_scopes__"
-
-
-def _api_key_scopes() -> tuple[str, ...]:
-    """Scopes to grant API-key callers when OAuth scopes are absent.
-
-    Controlled via API_KEY_SCOPES env var (CSV). Default: none, so API-key
-    callers stay read-only unless explicitly configured. This lets operators
-    align granted scopes with the actual rights of their OpenProject API keys
-    (some keys may be read-only, others may allow writes).
-    """
-
-    raw = os.getenv("API_KEY_SCOPES", "")
-    parts = [p.strip() for p in raw.split(",") if p.strip()]
-    return tuple(parts)
-
-
-def requires_scopes(*scopes: str):
-    """Decorator to annotate tools with required OAuth scopes."""
-
-    def decorator(func):
-        setattr(func, REQUIRED_SCOPES_ATTR, tuple(scopes))
-        return func
-
-    return decorator
 
 
 # --- Discovery helpers ----------------------------------------------------- #
@@ -134,8 +107,6 @@ def _wrap_tool(
         except Exception:
             rid = ensure_request_id(current_request_id())
 
-        required_scopes = getattr(func, REQUIRED_SCOPES_ATTR, None)
-
         start = time.perf_counter()
         log_event(
             "tool_start",
@@ -144,19 +115,6 @@ def _wrap_tool(
         )
         status = "ok"
         try:
-            if required_scopes:
-                ctx = get_context(require_api_key=False, require_base_url=False)
-                granted = set(ctx.auth_scopes or ())
-                # If OAuth scopes are missing (API-key caller), optionally grant
-                # operator-configured scopes from API_KEY_SCOPES so write tools can
-                # align with the caller's OpenProject API token capabilities.
-                if not granted:
-                    granted = set(_api_key_scopes())
-                needed = set(required_scopes)
-                if not needed.issubset(granted):
-                    raise ScopeDeniedError(
-                        f"missing required scopes: {', '.join(sorted(needed - granted))}"  # noqa: E501
-                    )
             result = await func(client, *args, **kwargs)
             return result
         except Exception as exc:

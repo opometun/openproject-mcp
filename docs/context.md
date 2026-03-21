@@ -1,50 +1,51 @@
-# Context / DI contract (Stage 2.3)
+# Context contract
 
-## Keys (ContextVars)
-- `api_key` (required)
-- `base_url` (required, deployment-static in this stage)
-- `request_id` (generated if absent)
-- `user_agent` (optional)
+## ContextVars
+
+- `api_key`
+- `base_url`
+- `request_id`
+- `user_agent`
 
 ## Precedence
-- HTTP: `X-OpenProject-Key` header overrides env; `X-Request-Id` optional; base_url comes **only** from env defaults (header override not supported/ignored). Missing api_key ⇒ 401; missing base_url ⇒ 500.
-- Stdio: env defaults (`OPENPROJECT_BASE_URL`, `OPENPROJECT_API_KEY`), request_id generated at startup; no per-request headers.
 
-## Header contract (HTTP)
-- `X-OpenProject-Key`: required
-- `X-Request-Id`: optional; echoed back if provided, otherwise generated
-- `User-Agent`: optional
-- Base URL header: not implemented/ignored; base_url is env-only.
+- HTTP:
+  `X-OpenProject-Key` -> `Authorization: Bearer <api-key>` -> `X-API-Key` -> `OPENPROJECT_API_KEY`
+- Stdio:
+  `OPENPROJECT_BASE_URL` and `OPENPROJECT_API_KEY` from env at startup
 
-## Error responses (HTTP middleware)
+`OPENPROJECT_BASE_URL` is always env-only. Per-request base URL override is not supported.
+
+## HTTP request contract
+
+- Canonical auth header: `X-OpenProject-Key`
+- Compatibility aliases accepted for 1.x: `X-API-Key`, `Authorization: Bearer <api-key>`
+- `X-Request-Id` is optional
+- `User-Agent` is optional
+
+## Error responses
+
 ```json
-{ "error": "missing_api_key" | "missing_base_url",
+{
+  "error": "missing_api_key" | "missing_base_url",
   "message": "...",
-  "request_id": "<id>" }
+  "request_id": "<id>"
+}
 ```
-Status: 401 for missing API key; 500 for missing base URL.
-Response header: `X-Request-Id`.
+
+- 401 for missing API key
+- 500 for missing base URL
+- `X-Request-Id` is echoed on the response
 
 ## Runtime behavior
-- ContextVars are set per request (HTTP) or once at startup (stdio) and then reused; hot-path code does **not** read env again after seeding.
-- Request IDs propagate into tool logs and outbound OpenProject client calls (`X-Request-Id` header added when present).
 
-## Core helper
-- `openproject_mcp.core.context.get_context()` → `RequestContext(api_key, base_url, request_id, user_agent)`; raises `MissingApiKeyError` / `MissingBaseUrlError` per require flags.
-- `seed_from_env()` to bootstrap env defaults (stdio).
-- `seed_from_headers(headers)` to parse HTTP headers without mutating globals.
-- `apply_request_context(...)` + `reset_context(tokens)` to set/reset ContextVars per request.
-- `ensure_request_id()` to generate IDs.
+- HTTP seeds context per request and resets it after the request.
+- Stdio seeds context once from env during startup.
+- Request IDs propagate into tool logs and outbound OpenProject client calls.
 
-## Examples
-### HTTP request
-```
-curl -X POST http://127.0.0.1:8000/mcp \
-  -H 'Accept: application/json, text/event-stream' \
-  -H 'Content-Type: application/json' \
-  -H 'X-OpenProject-Key: sk-abc123' \
-  -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.0"}}}'
-```
+## Helpers
 
-### Stdio bootstrap
-Set `OPENPROJECT_BASE_URL` and `OPENPROJECT_API_KEY`, then `python -m openproject_mcp.transports.stdio.main`. Core seeds ContextVars once from env.
+- `get_context()` returns `RequestContext(api_key, base_url, request_id, user_agent)`
+- `seed_from_env()` bootstraps stdio from env
+- `seed_from_headers()` parses HTTP request headers without mutating globals
+- `apply_request_context(...)` and `reset_context(tokens)` bracket request handling
