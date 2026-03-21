@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.hal import parse_id_from_href
-from openproject_mcp.core.registry import requires_scopes
 from openproject_mcp.core.tools._collections import embedded_elements
 from openproject_mcp.core.tools.metadata import (
     NotFoundResolutionError,
@@ -20,7 +19,6 @@ from openproject_mcp.core.utils.time_parser import (
 )
 
 
-@requires_scopes("time:write")
 async def log_time(
     client: OpenProjectClient,
     work_package_id: int,

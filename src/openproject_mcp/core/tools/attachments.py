@@ -13,7 +13,6 @@ from openproject_mcp.core.client import (
     OpenProjectHTTPError,
 )
 from openproject_mcp.core.hal import parse_id_from_href
-from openproject_mcp.core.registry import requires_scopes
 from openproject_mcp.core.tools._collections import embedded_elements
 
 MAX_PAGE_SIZE = 200
@@ -36,7 +35,6 @@ def _parse_disposition_filename(content_disposition: Optional[str]) -> Optional[
     return None
 
 
-@requires_scopes("attachment:write")
 async def attach_file_to_wp(
     client: OpenProjectClient,
     wp_id: int,
@@ -275,7 +273,7 @@ async def get_attachment_content(
 
     download_href, _ = await _attachment_download_url(client, attachment_id)
 
-    headers = {"Range": f"bytes=0-{max_bytes-1}"}
+    headers = {"Range": f"bytes=0-{max_bytes - 1}"}
     content: Optional[bytes] = None
     content_type: Optional[str] = None
 

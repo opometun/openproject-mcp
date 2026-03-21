@@ -30,8 +30,6 @@ dev = [
 http = [
     "uvicorn>=0.20.0",
     "starlette>=0.30.0",
-    "PyJWT[crypto]>=2.8.0",
-    "cryptography>=41.0.0",
 ]
 
 [build-system]

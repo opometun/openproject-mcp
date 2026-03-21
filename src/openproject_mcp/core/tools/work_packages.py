@@ -12,7 +12,6 @@ from openproject_mcp.core.models import (
     WorkPackageUpdateInput,
     WorkPackageUpdateStatusInput,
 )
-from openproject_mcp.core.registry import requires_scopes
 from openproject_mcp.core.tools._collections import embedded_elements
 from openproject_mcp.core.tools.metadata import (
     list_statuses,
@@ -449,7 +448,6 @@ async def list_work_packages(
     }
 
 
-@requires_scopes("wp:write")
 async def create_work_package(
     client: OpenProjectClient, data: WorkPackageCreateInput
 ) -> Dict[str, Any]:
@@ -532,7 +530,6 @@ async def create_work_package(
     return _wp_to_summary(created)
 
 
-@requires_scopes("wp:write")
 async def update_status(
     client: OpenProjectClient, data: WorkPackageUpdateStatusInput
 ) -> Dict[str, Any]:
@@ -559,7 +556,6 @@ async def update_status(
     return _wp_to_summary(patched)
 
 
-@requires_scopes("wp:write")
 async def update_work_package(
     client: OpenProjectClient, data: WorkPackageUpdateInput
 ) -> Dict[str, Any]:
@@ -734,7 +730,6 @@ async def update_work_package(
     return _wp_to_summary(patched)
 
 
-@requires_scopes("wp:comment")
 async def add_comment(
     client: OpenProjectClient, wp_id: int, comment: str
 ) -> Dict[str, Any]:
@@ -756,7 +751,6 @@ async def add_comment(
     }
 
 
-@requires_scopes("wp:write")
 async def append_work_package_description(
     client: OpenProjectClient, wp_id: int, text: str
 ) -> Dict[str, Any]:
@@ -795,8 +789,7 @@ async def append_work_package_description(
                 method="PATCH",
                 url=f"{client.base_url}/api/v3/work_packages/{wp_id}",
                 message=(
-                    "Work package was updated by someone else; "
-                    "please reload and retry."
+                    "Work package was updated by someone else; please reload and retry."
                 ),
             ) from exc
         raise

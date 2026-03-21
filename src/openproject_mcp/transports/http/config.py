@@ -114,7 +114,6 @@ class HttpConfig:
         "X-API-Key",
         "X-OpenProject-Key",
         "X-Request-Id",
-        "X-OpenProject-BaseUrl",
     )
     max_body_bytes: int = 1_000_000
     request_timeout_s: float = 30.0
@@ -127,40 +126,6 @@ class HttpConfig:
     rate_limit_ttl_windows: int = 3
     rate_limit_sse_rpm: int = 10
     rate_limit_hash_secret: str | None = None
-    # OAuth (optional, off by default)
-    oauth_enabled: bool = False
-    oauth_issuer: tuple[str, ...] = ("accounts.google.com",)
-    oauth_audience: tuple[str, ...] | None = None
-    oauth_jwks_url: tuple[str, ...] = ("https://www.googleapis.com/oauth2/v3/certs",)
-    oauth_jwks_cache_ttl: int = 3600
-    oauth_required_scopes: tuple[str, ...] = ()
-    token_store_backend: str = "memory"  # memory|firestore
-    token_enc_key: str | None = None
-
-    def __post_init__(self):
-        # Normalize single strings into tuples when instantiated directly
-        object.__setattr__(
-            self,
-            "oauth_issuer",
-            self._normalize_tuple(self.oauth_issuer),
-        )
-        object.__setattr__(
-            self,
-            "oauth_jwks_url",
-            self._normalize_tuple(self.oauth_jwks_url),
-        )
-        if self.oauth_audience is not None:
-            object.__setattr__(
-                self, "oauth_audience", self._normalize_tuple(self.oauth_audience)
-            )
-
-    @staticmethod
-    def _normalize_tuple(val):
-        if val is None:
-            return None
-        if isinstance(val, str):
-            return (val,)
-        return tuple(val)
 
     @classmethod
     def from_env(cls) -> "HttpConfig":
@@ -237,53 +202,6 @@ class HttpConfig:
         rate_limit_sse_rpm = _read_int_env("MCP_RATE_LIMIT_SSE_RPM", 10)
         rate_limit_hash_secret = os.getenv("MCP_RATE_LIMIT_HASH_SECRET")
 
-        oauth_enabled = _get_bool_env("OAUTH_ENABLED", False)
-        oauth_issuer = os.getenv("OAUTH_ISSUER") or None
-        oauth_audience = os.getenv("OAUTH_AUDIENCE") or None
-        oauth_jwks_url = os.getenv("OAUTH_JWKS_URL") or None
-        oauth_jwks_cache_ttl = int(os.getenv("OAUTH_JWKS_CACHE_TTL", "3600") or 3600)
-        oauth_required_scopes = tuple(_split_csv_env("OAUTH_REQUIRED_SCOPES"))
-        token_store_backend = os.getenv("OAUTH_TOKEN_STORE", "memory").lower()
-        token_enc_key = os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY")
-        if oauth_enabled and not oauth_audience:
-            raise ValueError(
-                "OAUTH_AUDIENCE (Google OAuth client ID) must be set when OAUTH_ENABLED=true"  # noqa: E501
-            )
-        # Normalize CSV env strings to tuples; fall back to class defaults
-        if oauth_issuer is not None:
-            oauth_issuer = tuple(
-                part.strip() for part in oauth_issuer.split(",") if part.strip()
-            )
-        else:
-            oauth_issuer = cls.oauth_issuer
-        if oauth_audience is not None:
-            oauth_audience = (
-                tuple(
-                    part.strip() for part in oauth_audience.split(",") if part.strip()
-                )
-                or None
-            )
-        if oauth_jwks_url is not None:
-            oauth_jwks_url = tuple(
-                part.strip() for part in oauth_jwks_url.split(",") if part.strip()
-            )
-        else:
-            oauth_jwks_url = cls.oauth_jwks_url
-
-        if oauth_enabled:
-            if not oauth_audience:
-                raise ValueError("OAUTH_AUDIENCE must be set when OAuth is enabled")
-            if len(oauth_issuer) != len(oauth_jwks_url):
-                raise ValueError(
-                    "OAUTH_ISSUER and OAUTH_JWKS_URL must have the same number of entries"  # noqa: E501
-                )
-            if len(oauth_audience) != len(oauth_issuer):
-                # Allow single audience applied to all issuers
-                if len(oauth_audience) != 1:
-                    raise ValueError("OAUTH_AUDIENCE count must be 1 or match issuers")
-        if token_store_backend not in {"memory", "firestore"}:
-            raise ValueError("OAUTH_TOKEN_STORE must be 'memory' or 'firestore'")
-
         rl_disable_allowed = rate_limit_allow_disable and env in {"dev", "local"}
         if not rl_disable_allowed:
             if rate_limit_rpm <= 0:
@@ -323,14 +241,6 @@ class HttpConfig:
             rate_limit_ttl_windows=rate_limit_ttl_windows,
             rate_limit_sse_rpm=rate_limit_sse_rpm,
             rate_limit_hash_secret=rate_limit_hash_secret,
-            oauth_enabled=oauth_enabled,
-            oauth_issuer=oauth_issuer,
-            oauth_audience=oauth_audience,
-            oauth_jwks_url=oauth_jwks_url,
-            oauth_jwks_cache_ttl=oauth_jwks_cache_ttl,
-            oauth_required_scopes=oauth_required_scopes,
-            token_store_backend=token_store_backend,
-            token_enc_key=token_enc_key,
         )
 
 

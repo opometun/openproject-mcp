@@ -15,12 +15,6 @@ _api_key_var: ContextVar[str | None] = ContextVar("api_key", default=None)
 _base_url_var: ContextVar[str | None] = ContextVar("base_url", default=None)
 _request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 _user_agent_var: ContextVar[str | None] = ContextVar("user_agent", default=None)
-_auth_principal_var: ContextVar[tuple[str, str] | None] = ContextVar(
-    "auth_principal", default=None
-)
-_auth_scopes_var: ContextVar[tuple[str, ...] | None] = ContextVar(
-    "auth_scopes", default=()
-)
 
 API_KEY_HEADER = "x-openproject-key"
 AUTHORIZATION_HEADER = "authorization"
@@ -43,8 +37,6 @@ class RequestContext:
     base_url: str
     request_id: str
     user_agent: Optional[str] = None
-    auth_principal: Optional[tuple[str, str]] = None
-    auth_scopes: tuple[str, ...] = ()
 
 
 def extract_api_key(
@@ -117,8 +109,6 @@ def apply_request_context(
     base_url: str,
     request_id: Optional[str] = None,
     user_agent: Optional[str] = None,
-    auth_principal: Optional[tuple[str, str]] = None,
-    auth_scopes: Optional[tuple[str, ...]] = None,
 ) -> Iterable[Token]:
     """Set ContextVars for the duration of a request; returns tokens for reset()."""
     tokens = []
@@ -126,8 +116,6 @@ def apply_request_context(
     tokens.append(_base_url_var.set(base_url))
     tokens.append(_request_id_var.set(ensure_request_id(request_id)))
     tokens.append(_user_agent_var.set(user_agent))
-    tokens.append(_auth_principal_var.set(auth_principal))
-    tokens.append(_auth_scopes_var.set(auth_scopes or ()))
     return tokens
 
 
@@ -150,8 +138,6 @@ def get_context(
     base_url = _base_url_var.get()
     request_id = ensure_request_id(_request_id_var.get())
     user_agent = _user_agent_var.get()
-    auth_principal = _auth_principal_var.get()
-    auth_scopes = _auth_scopes_var.get() or ()
 
     if require_api_key and not api_key:
         raise MissingApiKeyError("API key is required and missing.")
@@ -163,8 +149,6 @@ def get_context(
         base_url=base_url or "",
         request_id=request_id,
         user_agent=user_agent,
-        auth_principal=auth_principal,
-        auth_scopes=tuple(auth_scopes),
     )
 
 
@@ -186,6 +170,4 @@ __all__ = [
     "X_API_KEY_HEADER",
     "REQUEST_ID_HEADER",
     "USER_AGENT_HEADER",
-    "_auth_principal_var",
-    "_auth_scopes_var",
 ]
