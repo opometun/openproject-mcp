@@ -1,15 +1,56 @@
 # openproject-mcp
-MCP server for OpenProject with a small 1.0 surface: stdio and HTTP transports, deployment-static `OPENPROJECT_BASE_URL`, and API-key authentication only.
+Small-surface MCP server for OpenProject.
+
+It gives MCP clients a stable way to read and update a single OpenProject deployment without custom integration glue. The 1.0 line is intentionally narrow: Python 3.13, stdio and HTTP transports, deployment-fixed `OPENPROJECT_BASE_URL`, and API-key-only authentication.
+
+## What This Server Can Do
+
+Use this server when you want MCP clients to work with real OpenProject data and actions instead of a thin custom wrapper around the REST API.
+
+- expose OpenProject to MCP clients over `stdio` or HTTP
+- browse projects, work packages, users, memberships, and saved queries
+- resolve names to IDs for projects, users, statuses, types, and priorities
+- create and update work packages, add comments, attach and download files, and log time
+- keep write behavior simple: any valid API key can call write tools, and OpenProject itself decides whether the key has permission
+
+| Area | Capabilities |
+|------|--------------|
+| system | connectivity / ping |
+| projects | list projects, get project summary |
+| work packages | list, get, create, update, comment |
+| users | list users, get user |
+| memberships | project memberships |
+| queries | list queries, run query |
+| metadata | statuses, types, priorities, ID/name resolution |
+| attachments | list, download, attach |
+| time entries | list logged time, get my logged time, log time |
+
+## What It Does Not Do
+
+This project is intentionally narrow and intentionally single-tenant. It does not try to be a general auth broker, token store, or multi-tenant OpenProject gateway.
+
+- OAuth or JWT authentication
+- linked-token storage
+- token-linking or link/unlink flows
+- Firestore token backends
+- multi-user auth flows
+- per-request base URL override
+- delete or archive lifecycle
+
+For 1.0 migrations:
+- the canonical HTTP auth header is `X-OpenProject-Key`
+- `X-API-Key` and `Authorization: Bearer <api-key>` are accepted only as 1.x compatibility aliases
+- write permission is decided by OpenProject itself, not by local scope logic
 
 ## Quickstart
 
-Install the HTTP transport, set the OpenProject base URL in the environment, start the server, and send requests with `X-OpenProject-Key`.
+Install the HTTP transport, set the OpenProject base URL in the environment, start the server with the CLI, and send requests with `X-OpenProject-Key`.
 
 ```bash
 pip install "openproject-mcp[http]"
 
 export OPENPROJECT_BASE_URL="https://your-op.example.com"
-python -m openproject_mcp.transports.http.main
+openproject-mcp http
 ```
 
 ```bash
@@ -20,74 +61,41 @@ curl -X POST http://127.0.0.1:8000/mcp \
   -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.0"}}}'
 ```
 
-## Breaking Changes in 1.0
-
-- OAuth/JWT authentication was removed from the supported surface.
-- Token-linking and link/unlink flows were removed from the supported surface.
-- Canonical HTTP auth header: `X-OpenProject-Key`.
-- Compatibility aliases accepted for 1.x only: `X-API-Key`, `Authorization: Bearer <api-key>`.
-- Write permission is decided by OpenProject, not by local scope logic.
-
 ## 1.0 Contract
 
-Supported:
-- Transports: stdio and HTTP.
-- Base URL source: `OPENPROJECT_BASE_URL` from environment only.
-- Authentication: OpenProject API key only.
-- Canonical HTTP auth header: `X-OpenProject-Key`.
-- Current core tools: system, projects, work packages, users, memberships, queries, metadata, attachments, and time entries.
-- Write tools run when a valid API key is supplied; OpenProject decides whether the key has write permission.
+### Supported
 
-HTTP auth header behavior:
-- Canonical: `X-OpenProject-Key`
-- Compatibility aliases accepted for 1.x: `X-API-Key`, `Authorization: Bearer <api-key>`
-- Quickstart and main docs use only `X-OpenProject-Key`
+- Python: 3.13
+- Transports: stdio and HTTP
+- Base URL source: `OPENPROJECT_BASE_URL` from environment only
+- Authentication: OpenProject API key only
+- Canonical HTTP auth header: `X-OpenProject-Key`
+- Compatibility aliases for 1.x: `X-API-Key`, `Authorization: Bearer <api-key>`
+- Write tools run with any valid API key; OpenProject decides permission
+- Health endpoints: `GET /healthz`, `GET /readyz`
 
-Run modes:
-- HTTP: `python -m openproject_mcp.transports.http.main`
-- Stdio: `python -m openproject_mcp.transports.stdio.main`
+### Run Modes
 
-`OPENPROJECT_API_KEY` can still be supplied from the environment for default credentials, but the documented HTTP request path uses `X-OpenProject-Key`.
+- HTTP: `openproject-mcp http`
+- Stdio: `openproject-mcp stdio`
 
-## Non-goals
+### Notes
 
-Not supported in 1.0:
-- OAuth or JWT authentication
-- Linked-token storage
-- Firestore token backends
-- Multi-user auth flows
-- Dynamic per-request base URL override
-- Delete or archive lifecycle
+- `OPENPROJECT_API_KEY` may be supplied from the environment as a default credential.
+- HTTP examples and docs use `X-OpenProject-Key`.
+- Per-request base URL override is not supported.
+- HTTP defaults to `127.0.0.1:8000`; override with `FASTMCP_HOST`, `FASTMCP_PORT`, or CLI flags.
 
-## Support
+## Support and Validation
 
-Support matrix:
+| Component | Supported in 1.0.0 | Validation |
+|-----------|--------------------|------------|
+| Python | 3.13 | CI and release checks |
+| OpenProject | exact versions published at release time | `initialize` + `python -m scripts.smoke_test` against a real instance |
 
-| Component | Versions | Validation |
-|-----------|----------|------------|
-| Python | 3.13 | CI on every push and pull request |
-| OpenProject | Pending live validation before `1.0.0` | `initialize` plus `python -m scripts.smoke_test` against each claimed live version |
+Exact tested OpenProject versions are recorded in `docs/release.md` before tagging `1.0.0`.
 
-Release gate:
-- Exact OpenProject versions for `1.0.0` must be recorded in [docs/release.md](docs/release.md) before tagging the release.
-- Do not tag `1.0.0` until the release checklist is complete and the OpenProject support row is filled with exact tested versions.
-
-Local release checks completed on 2026-03-22:
-- `ruff check .`
-- `ruff format --check .`
-- `pytest`
-- base-install CLI help for `openproject-mcp`, `openproject-mcp stdio`, and `openproject-mcp http`
-
-Operational notes:
-- HTTP defaults: `127.0.0.1:8000`
-- Override HTTP host/port with `FASTMCP_HOST`, `FASTMCP_PORT`, or CLI flags
-- HTTP health endpoints: `GET /healthz`, `GET /readyz`
-- Stdio reads `OPENPROJECT_BASE_URL` and `OPENPROJECT_API_KEY` from env at startup
-- HTTP accepts the API key from `X-OpenProject-Key` or `OPENPROJECT_API_KEY`
-
-## Smoke Test
-
-Run an end-to-end check against a real OpenProject instance:
+Real-instance smoke test:
 
 ```bash
 OPENPROJECT_BASE_URL="https://your-op.example.com" \
@@ -102,24 +110,9 @@ Optional env overrides:
 
 The smoke test creates a work package, updates it, verifies the result, and leaves the artifact in OpenProject because delete/archive lifecycle is not supported.
 
-## Installation
+## Detailed Docs
 
-- Base package: `pip install openproject-mcp`
-- Explicit HTTP install path used in the quickstart: `pip install "openproject-mcp[http]"`
-
-The current base package also exposes the `openproject-mcp http` CLI entrypoint through transitive `mcp[cli]` dependencies.
-
-The unified CLI is available after installation:
-
-```bash
-openproject-mcp stdio
-openproject-mcp http
-```
-
-Config precedence for the CLI:
-1. CLI flags
-2. `FASTMCP_HOST` / `FASTMCP_PORT` and logging env vars
-3. TOML config file passed with `--config`
-4. Built-in defaults
-
-See `docs/transport.md`, `docs/context.md`, and `docs/ops.md` for transport defaults, request context rules, and readiness behavior.
+- Transport defaults and runtime options: `docs/transport.md`
+- Request context, header precedence, and error contract: `docs/context.md`
+- Health and readiness behavior: `docs/ops.md`
+- Release checklist and exact tested versions: `docs/release.md`

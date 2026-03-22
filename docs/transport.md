@@ -10,6 +10,10 @@
 
 ## Quick run
 
+- HTTP: `openproject-mcp http`
+- Stdio: `openproject-mcp stdio`
+
+Module runners remain available when needed:
 - HTTP: `python -m openproject_mcp.transports.http.main`
 - Stdio: `python -m openproject_mcp.transports.stdio.main`
 
