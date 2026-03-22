@@ -66,11 +66,17 @@ Support matrix:
 | Component | Versions | Validation |
 |-----------|----------|------------|
 | Python | 3.11, 3.13 | CI on every push and pull request |
-| OpenProject | Published from the completed 1.0 release checklist | `initialize` plus `python -m scripts.smoke_test` against each claimed live version |
+| OpenProject | Pending live validation before `1.0.0` | `initialize` plus `python -m scripts.smoke_test` against each claimed live version |
 
 Release gate:
 - Exact OpenProject versions for `1.0.0` must be recorded in [docs/release.md](docs/release.md) before tagging the release.
 - Do not tag `1.0.0` until the release checklist is complete and the OpenProject support row is filled with exact tested versions.
+
+Local release checks completed on 2026-03-22:
+- `ruff check .`
+- `ruff format --check .`
+- `pytest`
+- base-install CLI help for `openproject-mcp`, `openproject-mcp stdio`, and `openproject-mcp http`
 
 Operational notes:
 - HTTP defaults: `127.0.0.1:8000`
@@ -99,13 +105,15 @@ The smoke test creates a work package, updates it, verifies the result, and leav
 ## Installation
 
 - Base package: `pip install openproject-mcp`
-- HTTP transport: `pip install "openproject-mcp[http]"`
+- Explicit HTTP install path used in the quickstart: `pip install "openproject-mcp[http]"`
+
+The current base package also exposes the `openproject-mcp http` CLI entrypoint through transitive `mcp[cli]` dependencies.
 
 The unified CLI is available after installation:
 
 ```bash
 openproject-mcp stdio
-openproject-mcp http --host 0.0.0.0 --port 8000
+openproject-mcp http
 ```
 
 Config precedence for the CLI:
