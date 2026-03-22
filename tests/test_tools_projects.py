@@ -1,6 +1,7 @@
 import pytest
 import respx
 from httpx import Response
+
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.tools.projects import get_project_summary, list_projects
 

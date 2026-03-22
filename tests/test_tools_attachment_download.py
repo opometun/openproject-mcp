@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import respx
 from httpx import Response
+
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.tools.attachments import (
     download_attachment,

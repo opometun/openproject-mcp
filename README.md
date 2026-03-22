@@ -65,7 +65,7 @@ Support matrix:
 
 | Component | Versions | Validation |
 |-----------|----------|------------|
-| Python | 3.11, 3.13 | CI on every push and pull request |
+| Python | 3.13 | CI on every push and pull request |
 | OpenProject | Pending live validation before `1.0.0` | `initialize` plus `python -m scripts.smoke_test` against each claimed live version |
 
 Release gate:

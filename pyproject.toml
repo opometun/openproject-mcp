@@ -2,7 +2,7 @@
 name = "openproject-mcp"
 version = "0.1.0"
 description = "A Model Context Protocol server for OpenProject"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 readme = "README.md"
 authors = [
     { name = "Oleksandr Pometun", email = "43117125+opometun@users.noreply.github.com" }
@@ -21,7 +21,7 @@ openproject-mcp = "openproject_mcp.cli:main"
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
-    "ruff>=0.3.0",
+    "ruff>=0.15.7",
     "mypy>=1.0.0",
     "pre-commit>=3.5.0",
     "respx>=0.20.0", # For mocking HTTP requests in tests
@@ -40,7 +40,7 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"] # Error, Pyflakes, Isort, Bugbear
@@ -54,6 +54,6 @@ pythonpath = ["src"]
 asyncio_mode = "auto"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 ignore_missing_imports = true

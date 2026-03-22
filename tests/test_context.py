@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+
 from openproject_mcp.core.context import (
     MissingApiKeyError,
     MissingBaseUrlError,
