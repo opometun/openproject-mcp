@@ -10,8 +10,10 @@ from typing import Any, Dict, Optional
 from openproject_mcp.core.logging import setup_logging
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8080
+DEFAULT_PORT = 8000
 DEFAULT_LOG_LEVEL = "info"
+HTTP_HOST_ENV = "FASTMCP_HOST"
+HTTP_PORT_ENV = "FASTMCP_PORT"
 
 
 @dataclass(frozen=True)
@@ -37,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     http = subparsers.add_parser("http", parents=[common], help="Run MCP over HTTP")
     http.add_argument("--host", help="HTTP host (default 127.0.0.1)", default=None)
-    http.add_argument("--port", type=int, help="HTTP port (default 8080)", default=None)
+    http.add_argument("--port", type=int, help="HTTP port (default 8000)", default=None)
 
     return parser
 
@@ -70,8 +72,8 @@ def merge_config(args: argparse.Namespace) -> CliConfig:
         cfg = replace(cfg, log_level=str(file_cfg["log_level"]))
 
     # Environment overrides
-    env_host = os.getenv("MCP_HTTP_HOST")
-    env_port = os.getenv("MCP_HTTP_PORT")
+    env_host = os.getenv(HTTP_HOST_ENV)
+    env_port = os.getenv(HTTP_PORT_ENV)
     env_log = os.getenv("MCP_LOG_LEVEL") or os.getenv("OPENPROJECT_LOG_LEVEL")
     if env_host:
         cfg = replace(cfg, host=env_host)

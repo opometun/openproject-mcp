@@ -20,6 +20,14 @@ curl -X POST http://127.0.0.1:8000/mcp \
   -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.0"}}}'
 ```
 
+## Breaking Changes in 1.0
+
+- OAuth/JWT authentication was removed from the supported surface.
+- Token-linking and link/unlink flows were removed from the supported surface.
+- Canonical HTTP auth header: `X-OpenProject-Key`.
+- Compatibility aliases accepted for 1.x only: `X-API-Key`, `Authorization: Bearer <api-key>`.
+- Write permission is decided by OpenProject, not by local scope logic.
+
 ## 1.0 Contract
 
 Supported:
@@ -53,15 +61,20 @@ Not supported in 1.0:
 
 ## Support
 
-Supported Python versions:
-- 3.11
-- 3.13
+Support matrix:
 
-OpenProject versions tested before release:
-- The exact OpenProject versions must be recorded here before tagging `1.0.0`.
-- Until that validation run is published, no 1.0 OpenProject version claim is made.
+| Component | Versions | Validation |
+|-----------|----------|------------|
+| Python | 3.11, 3.13 | CI on every push and pull request |
+| OpenProject | Published from the completed 1.0 release checklist | `initialize` plus `python -m scripts.smoke_test` against each claimed live version |
+
+Release gate:
+- Exact OpenProject versions for `1.0.0` must be recorded in [docs/release.md](docs/release.md) before tagging the release.
+- Do not tag `1.0.0` until the release checklist is complete and the OpenProject support row is filled with exact tested versions.
 
 Operational notes:
+- HTTP defaults: `127.0.0.1:8000`
+- Override HTTP host/port with `FASTMCP_HOST`, `FASTMCP_PORT`, or CLI flags
 - HTTP health endpoints: `GET /healthz`, `GET /readyz`
 - Stdio reads `OPENPROJECT_BASE_URL` and `OPENPROJECT_API_KEY` from env at startup
 - HTTP accepts the API key from `X-OpenProject-Key` or `OPENPROJECT_API_KEY`
@@ -92,12 +105,12 @@ The unified CLI is available after installation:
 
 ```bash
 openproject-mcp stdio
-openproject-mcp http --host 0.0.0.0 --port 8080
+openproject-mcp http --host 0.0.0.0 --port 8000
 ```
 
 Config precedence for the CLI:
 1. CLI flags
-2. Environment
+2. `FASTMCP_HOST` / `FASTMCP_PORT` and logging env vars
 3. TOML config file passed with `--config`
 4. Built-in defaults
 
