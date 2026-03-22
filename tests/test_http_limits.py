@@ -3,6 +3,7 @@ import json
 import anyio
 import httpx
 import pytest
+
 from openproject_mcp.transports.http import HttpConfig, build_http_app
 from openproject_mcp.transports.http.config import (
     ERROR_PAYLOAD_TOO_LARGE,

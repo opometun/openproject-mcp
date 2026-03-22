@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 import respx
 from httpx import Response
+
 from openproject_mcp.core.client import (
     OpenProjectClient,
     OpenProjectClientError,

@@ -4,6 +4,7 @@ from datetime import date
 import pytest
 import respx
 from httpx import Response
+
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.tools.metadata import NotFoundResolutionError
 from openproject_mcp.core.tools.time_entries import (

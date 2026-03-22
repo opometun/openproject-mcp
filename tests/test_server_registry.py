@@ -3,6 +3,7 @@ from types import ModuleType
 
 import pytest
 from mcp.server.fastmcp import FastMCP
+
 from openproject_mcp.core.client import OpenProjectClient
 from openproject_mcp.server_registry import (
     discover_tool_modules,

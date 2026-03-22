@@ -3,6 +3,7 @@ import json
 import pytest
 import respx
 from httpx import Response
+
 from openproject_mcp.core.client import OpenProjectClient, OpenProjectHTTPError
 from openproject_mcp.core.tools.queries import list_queries, run_query
 

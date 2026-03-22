@@ -19,7 +19,7 @@ Record the exact validation results here before tagging `1.0.0`.
 
 | Component | Versions | Validation method | Validated on |
 |-----------|----------|-------------------|--------------|
-| Python | 3.11, 3.13 | `ruff check .`, `ruff format --check .`, `pytest`, and base-install CLI help checks | 2026-03-22 |
+| Python | 3.13 | `ruff check .`, `ruff format --check .`, `pytest`, and base-install CLI help checks | 2026-03-22 |
 | OpenProject | Pending live validation before tag | `initialize` plus `python -m scripts.smoke_test` against each claimed live version | |
 
 Notes:

@@ -1,5 +1,6 @@
 import httpx
 import pytest
+
 from openproject_mcp.transports.http import HttpConfig, build_http_app
 from openproject_mcp.transports.http.config import _normalize_origin
 
