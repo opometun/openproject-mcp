@@ -36,7 +36,7 @@ jobs:
           pytest
 
   test-base-install:
-    name: "Verify base install (stdio-only, no [http] extra)"
+    name: "Verify base install CLI entrypoints"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -60,8 +60,6 @@ jobs:
           openproject-mcp --help
           openproject-mcp stdio --help
 
-      - name: HTTP subcommand gives friendly error
+      - name: HTTP subcommand help works from base install
         run: |
-          openproject-mcp http 2>&1 | grep -q "openproject-mcp\[http\]" \
-            && echo "PASS: friendly error shown" \
-            || (echo "FAIL: expected friendly install hint" && exit 1)
+          openproject-mcp http --help

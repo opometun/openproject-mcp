@@ -13,6 +13,9 @@
 - HTTP: `python -m openproject_mcp.transports.http.main`
 - Stdio: `python -m openproject_mcp.transports.stdio.main`
 
+Both the module runner and `openproject-mcp http` default to `127.0.0.1:8000`.
+Override HTTP host/port with `FASTMCP_HOST`, `FASTMCP_PORT`, or CLI flags.
+
 ## Required configuration
 
 | Transport | Required env | API key source |

@@ -55,7 +55,7 @@ def build_fastmcp(cfg: HttpConfig | None = None) -> FastMCP:
         else:
             allowed_origins.append(_origin_to_str(spec))
 
-    allowed_hosts = [cfg.host, "testserver"]
+    allowed_hosts = [cfg.host, f"{cfg.host}:*", "testserver", "testserver:*"]
     if cfg.dev_allow_localhost:
         allowed_hosts.extend(["localhost", "localhost:*", "127.0.0.1", "127.0.0.1:*"])
     # Include hosts from allowlisted origins (with port if non-default)

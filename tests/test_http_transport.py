@@ -14,10 +14,10 @@ def test_mcp_version_guard():
     assert version not in MCP_EXCLUDED
 
 
-def _client(app, headers=None):
+def _client(app, headers=None, base_url="http://testserver"):
     transport = httpx.ASGITransport(app=app)
     return httpx.AsyncClient(
-        transport=transport, base_url="http://testserver", headers=headers or {}
+        transport=transport, base_url=base_url, headers=headers or {}
     )
 
 
@@ -104,6 +104,45 @@ async def test_http_initialize_and_tools_list(monkeypatch):
             tools = body["result"].get("tools", [])
             assert isinstance(tools, list)
             assert len(tools) >= 1
+
+
+@pytest.mark.asyncio
+async def test_http_initialize_accepts_default_host_header_with_port(monkeypatch):
+    monkeypatch.setenv("OPENPROJECT_BASE_URL", "http://example.com")
+    monkeypatch.setenv("OPENPROJECT_API_KEY", "dummy")
+
+    cfg = HttpConfig(
+        host="127.0.0.1",
+        port=8000,
+        path="/mcp",
+        json_response=True,
+        stateless_http=True,
+    )
+    app = build_http_app(cfg)
+
+    async with app.router.lifespan_context(app):
+        async with _client(
+            app,
+            {
+                "accept": "application/json",
+                "X-OpenProject-Key": "dummy",
+            },
+            base_url="http://127.0.0.1:8000",
+        ) as client:
+            resp = await client.post(
+                cfg.path,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "1",
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "0.0.0"},
+                    },
+                },
+            )
+            assert resp.status_code == 200
 
 
 @pytest.mark.asyncio

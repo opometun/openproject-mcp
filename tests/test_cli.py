@@ -9,8 +9,8 @@ def test_merge_precedence_cli_over_env_over_file(monkeypatch, tmp_path):
     cfg_file.write_text('host = "10.0.0.1"\nport = 9999\nlog_level = "warning"\n')
 
     # env overrides file
-    monkeypatch.setenv("MCP_HTTP_HOST", "10.0.0.2")
-    monkeypatch.setenv("MCP_HTTP_PORT", "7777")
+    monkeypatch.setenv("FASTMCP_HOST", "10.0.0.2")
+    monkeypatch.setenv("FASTMCP_PORT", "7777")
     monkeypatch.setenv("MCP_LOG_LEVEL", "error")
 
     parser = cli.build_parser()
@@ -31,6 +31,28 @@ def test_default_values_when_no_overrides():
     assert merged.host == cli.DEFAULT_HOST
     assert merged.port == cli.DEFAULT_PORT
     assert merged.log_level == cli.DEFAULT_LOG_LEVEL
+
+
+def test_http_help_text_uses_final_default_port():
+    parser = cli.build_parser()
+    subparsers = next(
+        action for action in parser._actions if getattr(action, "choices", None)
+    )
+    http_parser = subparsers.choices["http"]
+
+    assert "HTTP port (default 8000)" in http_parser.format_help()
+
+
+def test_legacy_mcp_http_env_vars_are_ignored(monkeypatch):
+    monkeypatch.setenv("MCP_HTTP_HOST", "10.0.0.2")
+    monkeypatch.setenv("MCP_HTTP_PORT", "7777")
+
+    parser = cli.build_parser()
+    args = parser.parse_args(["http"])
+    merged = cli.merge_config(args)
+
+    assert merged.host == cli.DEFAULT_HOST
+    assert merged.port == cli.DEFAULT_PORT
 
 
 def test_cli_importable_without_http_extra(tmp_path):
